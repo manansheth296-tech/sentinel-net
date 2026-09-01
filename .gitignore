@@ -1,0 +1,17 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables
+.env
+.venv
+env/
+venv/
+
+# Data
+data/raw/
+*.csv
+*.pcap
+*.parquet
+!data/processed/*.parquet
