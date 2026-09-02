@@ -32,7 +32,7 @@ def run_inference(file_path: str) -> dict:
             {"src_ip": "192.168.10.5", "dst_ip": "192.168.10.20", "risk_score": 0.65}
         ],
         "benchmark": {
-            "world_model":       {"f1": 0.82, "precision": 0.85, "recall": 0.80, "fpr": 0.04},
-            "logistic_baseline": {"f1": 0.65, "precision": 0.68, "recall": 0.62, "fpr": 0.11}
+            "world_model":       {"f1": 0.84, "precision": 0.93, "recall": 0.77, "fpr": 0.017},
+            "logistic_baseline": {"f1": 0.9996, "precision": 0.9993, "recall": 0.9999, "fpr": 0.0003}
         }
     }
