@@ -13,8 +13,12 @@ To prevent data leakage, all identifier and target columns are excluded:
   `Fwd Act Data Pkts`, `Fwd Seg Size Min`, `Active Mean/Std/Max/Min`, `Idle Mean/Std/Max/Min`.
 
 ## 2. World Model Sequence Input Shape
-- **Temporal Window Aggregation:** Each time window aggregates the 77 features into a **156-dimensional state vector** $S_t$ (77 Means + 77 Standard Deviations + Flow Counts + Active Flow Stats).
-- **Sequence Tensor Shape:** `(Batch_Size, 20, 156)` representing 20 consecutive time-step windows.
+- **Temporal Window Aggregation:**
+  - 77 numeric flow features $\rightarrow$ Mean (77) + Std (77) = 154 features
+  - $+ \text{flow\_count}$ (1)
+  - $+ \text{unique\_dst\_ports}$ (1)
+  - $= \mathbf{156\text{-dimensional state vector }} S_t$ per time window
+- **Sequence Tensor Shape:** `(Batch_Size, 20, 156)` representing 20 consecutive state windows fed into the LSTM.
 
 ## 3. Evaluation & Benchmarking Protocol
 - **No Random Splitting:** To avoid duplicate flow leakage from synchronized attack bursts, evaluation must use **chronological time splits** or **cross-file (out-of-distribution) splits**.
