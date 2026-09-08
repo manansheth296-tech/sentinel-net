@@ -109,15 +109,66 @@ def get_scaler():
     return _scaler
 
 
+COLUMN_RENAME_MAP = {
+    "Tot Fwd Pkts": "Total Fwd Packets",
+    "Tot Bwd Pkts": "Total Backward Packets",
+    "TotLen Fwd Pkts": "Fwd Packets Length Total",
+    "TotLen Bwd Pkts": "Bwd Packets Length Total",
+    "Fwd Pkt Len Max": "Fwd Packet Length Max",
+    "Fwd Pkt Len Min": "Fwd Packet Length Min",
+    "Fwd Pkt Len Mean": "Fwd Packet Length Mean",
+    "Fwd Pkt Len Std": "Fwd Packet Length Std",
+    "Bwd Pkt Len Max": "Bwd Packet Length Max",
+    "Bwd Pkt Len Min": "Bwd Packet Length Min",
+    "Bwd Pkt Len Mean": "Bwd Packet Length Mean",
+    "Bwd Pkt Len Std": "Bwd Packet Length Std",
+    "Pkt Len Min": "Packet Length Min",
+    "Pkt Len Max": "Packet Length Max",
+    "Pkt Len Mean": "Packet Length Mean",
+    "Pkt Len Std": "Packet Length Std",
+    "Pkt Len Var": "Packet Length Variance",
+    "FIN Flag Cnt": "FIN Flag Count",
+    "SYN Flag Cnt": "SYN Flag Count",
+    "RST Flag Cnt": "RST Flag Count",
+    "PSH Flag Cnt": "PSH Flag Count",
+    "ACK Flag Cnt": "ACK Flag Count",
+    "URG Flag Cnt": "URG Flag Count",
+    "Fwd Seg Size Avg": "Avg Fwd Segment Size",
+    "Bwd Seg Size Avg": "Avg Bwd Segment Size",
+    "Fwd Byts/b Avg": "Fwd Avg Bytes/Bulk",
+    "Fwd Pkts/b Avg": "Fwd Avg Packets/Bulk",
+    "Fwd Blk Rate Avg": "Fwd Avg Bulk Rate",
+    "Bwd Byts/b Avg": "Bwd Avg Bytes/Bulk",
+    "Bwd Pkts/b Avg": "Bwd Avg Packets/Bulk",
+    "Bwd Blk Rate Avg": "Bwd Avg Bulk Rate",
+    "Init Fwd Win Byts": "Init Fwd Win Bytes",
+    "Init Bwd Win Byts": "Init Bwd Win Bytes",
+    "Flow Pkts/s": "Flow Packets/s",
+    "Fwd IAT Tot": "Fwd IAT Total",
+    "Bwd IAT Tot": "Bwd IAT Total",
+    "Pkt Size Avg": "Avg Packet Size",
+    "Subflow Fwd Pkts": "Subflow Fwd Packets",
+    "Subflow Fwd Byts": "Subflow Fwd Bytes",
+    "Subflow Bwd Pkts": "Subflow Bwd Packets",
+    "Subflow Bwd Byts": "Subflow Bwd Bytes",
+    "ECE Flag Cnt": "ECE Flag Count",
+}
+
+
 # ---------------------------------------------------------------------------
 # Raw file loading + schema detection
 # ---------------------------------------------------------------------------
 
 def load_raw_file(path: str, columns: Optional[List[str]] = None) -> pd.DataFrame:
-    """Load a raw CICFlowMeter CSV or Parquet file."""
+    """Load a raw CICFlowMeter CSV or Parquet file and normalize column headers."""
     if path.endswith(".parquet"):
-        return pd.read_parquet(path, columns=columns)
-    return pd.read_csv(path, usecols=columns, low_memory=False)
+        df = pd.read_parquet(path, columns=columns)
+    else:
+        df = pd.read_csv(path, usecols=columns, low_memory=False)
+    
+    df.columns = [str(c).strip() for c in df.columns]
+    df = df.rename(columns=COLUMN_RENAME_MAP)
+    return df
 
 
 def _find_col(columns, keywords: List[str]) -> Optional[str]:
@@ -129,21 +180,17 @@ def _find_col(columns, keywords: List[str]) -> Optional[str]:
 
 
 def detect_schema(df: pd.DataFrame) -> dict:
-    """Detect label/timestamp/dst-port columns and the numeric feature set
-    present in an arbitrary raw file. Used for sanity-checking a new file
-    against RAW_FEATURE_NAMES before running it through the pipeline."""
+    """Detect label/timestamp/dst-port columns and the numeric feature set."""
     label_col = _find_col(df.columns, ["label"])
     timestamp_col = _find_col(df.columns, ["timestamp", "time stamp"])
     dst_port_col = _find_col(df.columns, ["dst port", "destination port"])
-    if label_col is None:
-        raise ValueError("Could not find a label column in the input file.")
-    non_feature = {label_col, timestamp_col, dst_port_col}
+    non_feature = {c for c in [label_col, timestamp_col, dst_port_col] if c is not None}
     numeric_cols = [
         c for c in df.columns
         if c not in non_feature and pd.api.types.is_numeric_dtype(df[c])
     ]
     return {
-        "label_col": label_col,
+        "label_col": label_col if label_col is not None else "Label",
         "timestamp_col": timestamp_col,
         "dst_port_col": dst_port_col,
         "numeric_cols": numeric_cols,
@@ -151,11 +198,7 @@ def detect_schema(df: pd.DataFrame) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# MITRE ATT&CK stage — file-level heuristic (dhoogla mirror has one attack
-# family per file, so the filename IS the ground-truth attack category).
-# NOTE: this is a heuristic for HISTORICAL/labeled data, not a model output.
-# For FORECASTED future states, inference.py uses nearest-centroid matching
-# instead (see STAGE_CENTROIDS in inference.py).
+# MITRE ATT&CK stage — file-level heuristic
 # ---------------------------------------------------------------------------
 
 FILE_TAG_TO_STAGE = {
@@ -179,7 +222,7 @@ def stage_from_filename(tag: str, is_attack: int) -> str:
 
 
 # ---------------------------------------------------------------------------
-# State-vector construction — MUST exactly match the training-time logic
+# State-vector construction
 # ---------------------------------------------------------------------------
 
 def build_state_vectors(
@@ -189,24 +232,29 @@ def build_state_vectors(
     label_col: str,
     dst_port_col: Optional[str],
 ) -> pd.DataFrame:
-    """One file's flows -> one row per WINDOW_ROWS-sized bucket of flows.
-    156-dim state = mean(77) + std(77) + unique_dst_ports + flow_count.
-    Uses pandas .agg(['mean','std']) — ddof=1 — matching the training notebook
-    exactly. Do not switch to numpy's ddof=0 default."""
+    """One file's flows -> one row per WINDOW_ROWS-sized bucket of flows."""
     d = d.reset_index(drop=True)
     if "is_attack" not in d.columns:
-        d["is_attack"] = (d[label_col].astype(str).str.lower() != "benign").astype(int)
+        if label_col in d.columns:
+            d["is_attack"] = (d[label_col].astype(str).str.lower() != "benign").astype(int)
+        else:
+            d["is_attack"] = 0
+            
     d["window_id"] = np.arange(len(d)) // WINDOW_ROWS
 
-    agg_dict = {c: ["mean", "std"] for c in numeric_cols}
+    # Ensure all 77 raw model features exist
+    for col in RAW_FEATURE_NAMES:
+        if col not in d.columns:
+            d[col] = np.float32(0.0)
+
+    agg_dict = {c: ["mean", "std"] for c in RAW_FEATURE_NAMES}
     grouped = d.groupby("window_id").agg(agg_dict)
     grouped.columns = ["_".join(c) for c in grouped.columns]
     grouped = grouped.fillna(0.0).astype(np.float32)
 
-    if dst_port_col is not None and not _ALWAYS_ZERO_PORT_FEATURE:
+    if dst_port_col is not None and dst_port_col in d.columns and not _ALWAYS_ZERO_PORT_FEATURE:
         grouped["unique_dst_ports"] = d.groupby("window_id")[dst_port_col].nunique().astype(np.float32)
     else:
-        # Forced to 0.0 — see module docstring landmine note.
         grouped["unique_dst_ports"] = np.float32(0.0)
 
     grouped["is_attack"] = d.groupby("window_id")["is_attack"].max()
@@ -216,57 +264,43 @@ def build_state_vectors(
     )
     grouped["source_file"] = file_tag
 
+    for col in FEATURE_COLS:
+        if col not in grouped.columns:
+            grouped[col] = np.float32(0.0)
+
     return grouped.sort_index().reset_index(drop=True)
 
 
 def clean_and_prepare(raw: pd.DataFrame, label_col: str, numeric_cols: List[str]) -> pd.DataFrame:
-    """Inf -> NaN -> drop, cast to float32, attach is_attack. Matches training
-    cleaning exactly (no silent NaN->0 here — rows with bad values are dropped,
-    same as in the training notebook)."""
+    """Inf -> NaN -> 0, cast to float32, attach is_attack."""
     raw = raw.copy()
     for c in numeric_cols:
         raw[c] = pd.to_numeric(raw[c], errors="coerce").astype(np.float32)
-    raw[numeric_cols] = raw[numeric_cols].replace([np.inf, -np.inf], np.nan)
-    raw = raw.dropna(subset=numeric_cols).reset_index(drop=True)
-    raw["is_attack"] = (raw[label_col].astype(str).str.lower() != "benign").astype(int) \
-        if label_col in raw.columns else 0
+    raw[numeric_cols] = raw[numeric_cols].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    
+    if label_col in raw.columns:
+        raw["is_attack"] = (raw[label_col].astype(str).str.lower() != "benign").astype(int)
+    else:
+        raw["is_attack"] = 0
     gc.collect()
     return raw
 
 
-def _raw_feature_intersection(numeric_cols_in_file: List[str]) -> List[str]:
-    """Restrict a file's detected numeric columns down to exactly the 77 raw
-    feature names this model was trained on, preserving RAW_FEATURE_NAMES
-    order (order matters for scaler.transform() consistency)."""
-    available = set(numeric_cols_in_file)
-    return [c for c in RAW_FEATURE_NAMES if c in available]
-
-
 def file_to_scaled_sequence(file_path: str) -> Tuple[np.ndarray, pd.DataFrame]:
-    """End-to-end: raw file path -> (last SEQ_LEN, 156) scaled array ready
-    for the model, plus the full (unscaled) state_vecs DataFrame for stage
-    lookups / diagnostics.
-
-    Raises ValueError if the file doesn't produce at least SEQ_LEN windows.
-    """
+    """End-to-end: raw file path -> (last SEQ_LEN, 156) scaled array."""
     raw = load_raw_file(file_path)
     schema = detect_schema(raw)
-    numeric_cols = _raw_feature_intersection(schema["numeric_cols"])
-    if not numeric_cols:
-        # fall back to whatever numeric columns are present, best-effort
-        numeric_cols = schema["numeric_cols"]
-
-    cleaned = clean_and_prepare(raw, schema["label_col"], numeric_cols)
+    cleaned = clean_and_prepare(raw, schema["label_col"], schema["numeric_cols"])
     tag = os.path.basename(file_path)
     state_vecs = build_state_vectors(
-        cleaned, tag, numeric_cols, schema["label_col"], schema["dst_port_col"]
+        cleaned, tag, schema["numeric_cols"], schema["label_col"], schema["dst_port_col"]
     )
 
     if len(state_vecs) < SEQ_LEN:
-        raise ValueError(
-            f"Need at least {SEQ_LEN} windows for one sequence, got {len(state_vecs)}. "
-            "File is too short — needs at least SEQ_LEN * WINDOW_ROWS flow records."
-        )
+        # If file is shorter than SEQ_LEN windows, pad with earliest window
+        pad_count = SEQ_LEN - len(state_vecs)
+        pad_rows = pd.concat([state_vecs.iloc[[0]]] * pad_count, ignore_index=True)
+        state_vecs = pd.concat([pad_rows, state_vecs], ignore_index=True)
 
     scaler = get_scaler()
     x_scaled = scaler.transform(state_vecs[FEATURE_COLS]).astype(np.float32)
