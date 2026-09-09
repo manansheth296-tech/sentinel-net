@@ -15,3 +15,11 @@ data/raw/
 *.pcap
 *.parquet
 !data/processed/*.parquet
+
+# Node / Frontend
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+

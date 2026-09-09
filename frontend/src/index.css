@@ -1,0 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+/* ── Tell Tailwind v4 to use the .dark class on <html> for the dark: variant ── */
+@variant dark (&:where(.dark, .dark *));
+
+/* ── Design tokens ──────────────────────────────────────────────────────── */
+:root {
+  /* Dark theme (default) */
+  --bg:        #0B0F1A;
+  --panel:     #121729;
+  --panel-alt: #0D1120;
+  --border:    #232B45;
+  --text:      #E9ECF6;
+  --muted:     #8A93B3;
+  --input-bg:  #0B0F1A;
+  --gauge-dim: #1E2540;
+}
+
+:root.light {
+  --bg:        #F0F2F8;
+  --panel:     #FFFFFF;
+  --panel-alt: #F9FAFB;
+  --border:    #DDE1EF;
+  --text:      #12131A;
+  --muted:     #6B7280;
+  --input-bg:  #F0F2F8;
+  --gauge-dim: #DDE1EF;
+}
+
+/* ── Base ───────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* ── Semantic utility classes (used everywhere instead of dark: duplication) */
+.bg-surface   { background-color: var(--bg); }
+.bg-panel     { background-color: var(--panel); }
+.bg-panel-alt { background-color: var(--panel-alt); }
+.border-base  { border-color: var(--border); }
+.text-primary { color: var(--text); }
+.text-muted   { color: var(--muted); }
+
+/* ── Typography ─────────────────────────────────────────────────────────── */
+.font-mono {
+  font-family: 'JetBrains Mono', 'IBM Plex Mono', 'Fira Code', monospace;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar          { width: 6px; height: 6px; }
+::-webkit-scrollbar-track    { background: var(--bg); }
+::-webkit-scrollbar-thumb    { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #8B5CF6; }
+
+/* ── Recharts ───────────────────────────────────────────────────────────── */
+.recharts-tooltip-wrapper { outline: none; }
+
+/* ── Toast slide-in ─────────────────────────────────────────────────────── */
+@keyframes slide-in-from-bottom-2 {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+.animate-in { animation: slide-in-from-bottom-2 0.2s ease-out; }
