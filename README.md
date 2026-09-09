@@ -1,179 +1,287 @@
-# SentinelNet: AI-Based Network Attack Forecasting
+# SentinelNet
 
-[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
-[![Framework](https://img.shields.io/badge/PyTorch-LSTM-red.svg)](https://pytorch.org/)
-[![UI](https://img.shields.io/badge/Streamlit-Dashboard-FF4B4B.svg)](https://streamlit.io/)
-[![Execution](https://img.shields.io/badge/Offline-100%25-green.svg)](#offline-deployment)
+SentinelNet is a network-traffic analysis platform that combines a FastAPI inference service with a React/Vite dashboard. It transforms CICFlowMeter-style flow data into temporal network states, forecasts near-future attack risk with an LSTM world model, maps the result to a MITRE ATT&CK stage, and exposes feature-level explanations for the dashboard.
 
-> **SIH 2026 · Problem Statement SIH26153 (NTRO)**  
-> Real-time, offline network attack forecasting system utilizing sequence dynamics modeling ($P(S_{t+1} \mid S_t)$) to project multi-step infiltration probability timelines and MITRE ATT&CK progression.
+> **Project status:** internal prototype / hackathon demonstration. The current model is trained on a generic any-attack target, not an infiltration-only target. See [Model limitations](#model-limitations) before using the results operationally.
 
----
+## Features
 
-## 📌 Key Capabilities
+- Upload `.csv` or `.pcap` files from the web dashboard.
+- Clean and normalize CICFlowMeter column names, repeated headers, missing values, and infinite values.
+- Aggregate 77 raw numeric flow features into 156-dimensional temporal state vectors.
+- Feed the latest 20 states into the V4 LSTM world model.
+- Forecast multiple future risk probabilities.
+- Display predicted MITRE ATT&CK stage, top feature contributions, flagged flows, and benchmark metrics.
+- Run the backend independently through FastAPI and the frontend independently through Vite.
 
-- **State Dynamics Modeling ($P(S_{t+1} \mid S_t)$):** Learns temporal traffic evolution using LSTM networks rather than simple static classification.
-- **Multi-Step Horizon Rollout:** Projects attack trajectory up to $K$ windows into the future.
-- **MITRE ATT&CK Stage Mapping:** Maps anomalous traffic behavior to formal MITRE cyber kill chain stages (`Reconnaissance` $\to$ `Initial Access` $\to$ `Lateral Movement` $\to$ `Command & Control` $\to$ `Exfiltration`).
-- **Explainability (XAI):** Uses SHAP (SHapley Additive exPlanations) and permutation importance for localized flag, port, and flow feature attribution.
-- **Comparative Benchmarking:** Validates world model performance against a standard `LogisticRegression` baseline on $F_1$-score, precision, recall, and false positive rate (FPR).
-- **100% Offline Architecture:** Requires zero external cloud APIs, running fully self-contained on local hardware.
-
----
-
-## 🗂 Project Directory Structure
+## Architecture
 
 ```text
-sih26153-network-forecast/
+Network capture / CICFlowMeter CSV
+							|
+							v
+			 FastAPI /api/analyze
+							|
+							v
+	 Column normalization and cleaning
+							|
+							v
+	200-row windows -> mean/std + counts
+							|
+							v
+			 20 x 156 LSTM sequence
+							|
+							v
+	Risk forecast + stage + explanations
+							|
+							v
+			 React/Vite dashboard
+```
+
+The model state is built as:
+
+```text
+77 raw features
+	-> mean (77) + standard deviation (77)
+	-> unique_dst_ports (1) + flow_count (1)
+	-> 156-dimensional state
+	-> 20 consecutive states
+	-> LSTM input shape: (20, 156)
+```
+
+The current V4 bundle uses 200-row pseudo-windows because the training mirror does not provide a reliable timestamp. The preprocessing contract is defined in [docs/CONTRACT.md](docs/CONTRACT.md).
+
+## Repository layout
+
+```text
+.
+├── requirements.txt                # Python environment used by the backend
 ├── backend/
 │   ├── __init__.py
-│   ├── data_prep.py              # Sequence windowing & state vector extraction
-│   ├── engine.py                 # Core inference orchestration & API contract output
-│   ├── explain.py                # SHAP / Feature importance explainability engine
-│   ├── mitre_mapping.py          # Rule-based dataset to MITRE stage mapper
-│   ├── server.py                 # FastAPI REST API server (/api/analyze)
-│   └── train_baseline.py         # Logistic regression baseline & benchmark harness
-├── frontend/
-│   ├── public/                   # Static assets (favicons, SVG icons)
-│   ├── src/
-│   │   ├── api/                  # API client (analyze.js)
-│   │   ├── components/           # UI components (InfiltrationChart, RiskGauge, etc.)
-│   │   ├── context/              # Application & Toast context
-│   │   ├── views/                # Dashboard, LiveAnalysis, Findings, Settings, Profile
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   ├── package.json
-│   ├── vite.config.js            # Vite reverse proxy to FastAPI backend
-│   └── index.html
-├── model/
-│   ├── __init__.py
-│   ├── export_bundle_v4.json     # Serialized model metadata & evaluation stats
-│   ├── inference.py              # PyTorch inference routine
-│   ├── preprocessing.py          # Feature transformation helpers
-│   ├── scaler_v4.pkl             # Pre-fitted 156-dim StandardScaler
-│   ├── world_model_v4_best.pt    # Trained LSTM weights (1.3 MB)
-│   └── README_LSTM_WORLD_MODEL.md
-├── app/
-│   ├── __init__.py
-│   └── streamlit_app.py          # Standalone offline Streamlit UI dashboard
+│   ├── data_prep.py                # CSV cleaning and state construction
+│   ├── engine.py                   # Cached model inference and response assembly
+│   ├── explain.py                  # SHAP / permutation explanations
+│   ├── mitre_mapping.py            # Stage mapping helpers
+│   └── server.py                   # FastAPI application server (/api/analyze)
 ├── data/
 │   ├── __init__.py
-│   ├── clean_dataset.py          # Header removal, NaN/Inf handling
-│   ├── convert_to_v4.py          # CIC-IDS-2018 to V4 feature schema alignment
-│   ├── sample_test.csv           # Pre-validated sample capture for demo runs
-│   ├── raw/                      # Raw capture CSV drop location
-│   └── processed/                # Normalized tensor splits
-├── docs/
-│   ├── CONTRACT.md               # Strict feature schema & JSON contract definition
-│   ├── DATA_PREPROCESSING.md     # Detailed data engineering manual
-│   └── architecture.md           # Technical architecture specification
-├── tests/
-│   └── test_data_prep.py         # Unit & integration test suite
-├── .gitignore                    # Git ignore file
-├── requirements.txt              # Unified project dependencies
-└── README.md                     # Repository documentation
+│   ├── clean_dataset.py            # Dataset cleaning utilities
+│   ├── convert_to_v4.py            # Feature format converter
+│   └── sample_test.csv             # Pre-validated sample capture
+├── model/
+│   ├── __init__.py
+│   ├── inference.py                # V4 LSTM inference wrapper
+│   ├── preprocessing.py            # Model-side preprocessing
+│   ├── export_bundle_v4.json       # Feature order and model configuration
+│   ├── scaler_v4.pkl               # 156-dim StandardScaler
+│   ├── world_model_v4_best.pt      # V4 checkpoint
+│   └── README_LSTM_WORLD_MODEL.md  # Model architecture & evaluation notes
+├── app/
+│   ├── __init__.py
+│   └── streamlit_app.py            # Standalone Streamlit dashboard
+├── frontend/
+│   ├── src/                        # React dashboard
+│   ├── public/                     # Static assets (icons, favicons)
+│   ├── package.json                # Frontend scripts and dependencies
+│   └── vite.config.js              # Port and backend API proxy
+├── tests/test_data_prep.py         # Preprocessing test suite
+└── docs/CONTRACT.md                # Data and response contract
 ```
 
----
+## Requirements
 
-## 🚀 Getting Started
+- Python 3.11 or a compatible modern Python version.
+- Node.js 18+ and npm.
+- The Python dependencies in `requirements.txt`.
+- The V4 model artifacts in `model/`.
 
-### 1. Prerequisites
-- Python 3.11+
-- Node.js 18+ & npm
-- Git
+The backend expects these files from the same training run:
 
-### 2. Installation
-```bash
-# Clone the repository
-git clone https://github.com/manansheth296-tech/sentinel-net.git
-cd sih26153-network-forecast
+```text
+model/world_model_v4_best.pt
+model/scaler_v4.pkl
+model/export_bundle_v4.json
+```
 
-# Create and activate Python virtual environment
+`scaler_v4.pkl` is required by `backend/engine.py` and must match the checkpoint and export bundle. Do not mix artifacts from different training runs. Model binaries and scalers should be managed as release artifacts rather than regenerated casually.
+
+## Quick start
+
+### 1. Create the Python environment
+
+From the repository root:
+
+```powershell
 python -m venv .venv
-.venv\Scripts\activate      # Windows
-# source .venv/bin/activate # Linux/macOS
+.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
 
-# Install Python dependencies
-pip install -r requirements.txt
+If PowerShell blocks activation, use the Python executable directly or adjust the local execution policy for your user account.
 
-# Install Frontend dependencies
-cd frontend
+### 2. Start the backend
+
+```powershell
+python -m uvicorn backend.server:app --host 0.0.0.0 --port 8000 --reload
+```
+
+The API listens on `http://localhost:8000`.
+
+Verify the service:
+
+```powershell
+curl http://localhost:8000/api/health
+```
+
+Expected response:
+
+```json
+{"status":"healthy","service":"sentinelnet-backend"}
+```
+
+FastAPI's interactive documentation is available at `http://localhost:8000/docs`.
+
+### 3. Install and start the frontend
+
+In a second terminal:
+
+```powershell
+Set-Location frontend
 npm install
-cd ..
-```
-
-### 3. Run Preprocessing & Feature Extraction
-```bash
-# Convert raw CIC-IDS-2018 CSV
-python data/convert_to_v4.py --input data/raw/03-01-2018.csv --output data/raw/03-01-2018_v4.csv
-
-# Clean and sanitize dataset
-python data/clean_dataset.py --input data/raw/03-01-2018_v4.csv
-```
-
-### 4. Run Test Suite
-```bash
-python -m pytest tests/test_data_prep.py -v
-```
-
-### 5. Launch Full Stack (FastAPI Backend + React Frontend)
-
-**Terminal 1 — Backend (Port 8000):**
-```bash
-uvicorn backend.server:app --host 0.0.0.0 --port 8000 --reload
-```
-
-**Terminal 2 — Frontend (Port 5173):**
-```bash
-cd frontend
 npm run dev
 ```
 
-*(Optional) Launch Standalone Streamlit Dashboard:*
-```bash
-streamlit run app/streamlit_app.py
+Open `http://localhost:5173`. Vite proxies `/api/*` requests to `http://localhost:8000`, so both services should be running during live analysis.
+
+## Frontend commands
+
+Run these from `frontend/`:
+
+```powershell
+npm run dev       # Start Vite development server on port 5173
+npm run build     # Create a production build in frontend/dist
+npm run preview   # Preview the production build locally
+npm run lint      # Run Oxlint
 ```
 
----
+The dashboard also includes a **Load sample** flow backed by static data in `frontend/src/data/mockResult.js`; it does not require the backend.
 
-## 📊 Model Contract Schema
+## Backend API
 
-Inference execution via `backend/engine.py` returns a strict JSON payload:
+### `GET /health`
+
+Returns the service and model status.
+
+### `POST /api/analyze`
+
+Send a multipart form upload with the field name `file`:
+
+```powershell
+curl -X POST http://localhost:8000/api/analyze `
+	-F "file=@path\to\flows.csv"
+```
+
+Accepted file extensions are `.csv` and `.pcap`. The endpoint returns HTTP 400 for unsupported extensions and HTTP 500 if inference fails.
+
+The response contains:
 
 ```json
 {
-  "infiltration_timeline": [
-    { "window_start": "2018-02-14T10:00:00", "probability": 0.12 },
-    { "window_start": "2018-02-14T10:01:00", "probability": 0.63 }
-  ],
-  "predicted_stage": "Lateral Movement",
-  "stage_probs": {
-    "Reconnaissance": 0.05,
-    "Initial Access": 0.10,
-    "Lateral Movement": 0.55,
-    "Command & Control": 0.20,
-    "Exfiltration": 0.10
-  },
-  "top_features": [
-    { "feature": "SYN Flag Count", "importance": 0.31 },
-    { "feature": "Fwd IAT Mean", "importance": 0.22 }
-  ],
-  "flagged_flows": [
-    { "src_ip": "192.168.10.5", "dst_ip": "192.168.10.50", "risk_score": 0.81 }
-  ],
-  "benchmark": {
-    "world_model":       { "f1": 0.84, "precision": 0.93, "recall": 0.77, "fpr": 0.017 },
-    "logistic_baseline": { "f1": 0.61, "precision": 0.68, "recall": 0.56, "fpr": 0.082 }
-  }
+	"infiltration_timeline": [
+		{"window_start": "12:00:10", "probability": 0.63}
+	],
+	"predicted_stage": "Initial Access",
+	"stage_probs": {
+		"Reconnaissance": 0.05,
+		"Initial Access": 0.65,
+		"Lateral Movement": 0.05,
+		"Command & Control": 0.05,
+		"Impact": 0.05
+	},
+	"top_features": [
+		{"feature": "SYN Flag Count", "importance": 0.31}
+	],
+	"flagged_flows": [
+		{"src_ip": "192.168.10.5", "dst_ip": "192.168.10.50", "risk_score": 0.81}
+	],
+	"benchmark": {
+		"world_model": {"f1": 0.8403, "precision": 0.9304, "recall": 0.7662, "fpr": 0.0167},
+		"logistic_baseline": {"f1": 0.612, "precision": 0.684, "recall": 0.554, "fpr": 0.082}
+	}
 }
 ```
 
----
+The complete contract and feature list are maintained in [docs/CONTRACT.md](docs/CONTRACT.md).
 
-## 🔒 Offline Deployment
+## Data and preprocessing
 
-This application operates completely standalone without external network calls or cloud dependencies:
-- **Weights & Scaler:** Loaded locally from `model/`.
-- **Explainability:** Computed locally via `shap` background samples.
-- **Frontend Dashboard:** Runs locally on `http://localhost:8501`.
+The pipeline is designed for CICFlowMeter-style CSV files. It:
+
+1. Reads UTF-8 CSV data and strips header whitespace.
+2. Normalizes common alternate CICFlowMeter column names.
+3. Removes repeated header rows.
+4. Excludes identifiers and labels from the numeric model input, including `Label`, `Timestamp`, `Flow ID`, IP addresses, and source/destination ports.
+5. Converts model features to numeric values and replaces `NaN`, positive infinity, and negative infinity with `0` without dropping rows.
+6. Preserves file order and assigns consecutive 200-row windows for the current V4 checkpoint.
+7. Aggregates each window into a 156-dimensional state and takes the latest 20 states.
+8. Applies the pre-trained `StandardScaler`; it is never fitted on uploaded data.
+
+For reproducible preprocessing, keep feature order synchronized with `model/export_bundle_v4.json`. The current training data did not contain usable destination-port values, so `unique_dst_ports` was effectively always zero during training. This should be addressed with a retrained model before using real port counts for production inference.
+
+## Model limitations
+
+The current model is useful for demonstrating the end-to-end workflow, but its output needs careful interpretation:
+
+- The target is generic **any attack**, not a dedicated infiltration label. `infiltration_timeline` is therefore an attack-risk forecast, not proof of infiltration.
+- MITRE stage mapping is partly heuristic and can use file-level attack-family metadata rather than a traffic-derived per-flow stage.
+- The current checkpoint uses 200-row pseudo-windows rather than true time windows.
+- The reported benchmark is based on a chronological per-file split. Some file test slices contain few or no attack windows, and infiltration-specific performance is weaker than aggregate performance.
+- The backend contains a safe fallback response when inference raises an exception. A fallback-shaped response should not be interpreted as a successful model prediction; inspect backend logs when results look suspicious.
+- The checked-in V4 artifacts must remain a matched set. Replacing only the checkpoint or scaler can produce invalid predictions without an obvious shape error.
+
+The model handoff and evaluation details are documented in [model/README_LSTM_WORLD_MODEL.md](model/README_LSTM_WORLD_MODEL.md).
+
+## Testing
+
+Run the preprocessing suite from the repository root:
+
+```powershell
+python -m pytest tests/test_data_prep.py -v
+```
+
+The tests cover column normalization, repeated-header removal, NaN/infinity handling, zero-duration flows, chronological windowing, metadata exclusion, state dimensions, and sequence construction. A full inference test requires a valid matching `model/scaler_v4.pkl` artifact.
+
+For frontend validation:
+
+```powershell
+Set-Location frontend
+npm run lint
+npm run build
+```
+
+## Troubleshooting
+
+### `FileNotFoundError` for `scaler_v4.pkl`
+
+Place the scaler from the same training run as `world_model_v4_best.pt` at `model/scaler_v4.pkl`. Do not rename an unrelated scaler to satisfy the import.
+
+### The dashboard cannot reach the API
+
+Confirm that the backend is running on port `8000`, the frontend is running on port `5173`, and the request path is `/api/analyze`. The Vite proxy is configured in `frontend/vite.config.js`.
+
+### Upload returns HTTP 400
+
+The backend checks the filename extension. Rename or export the capture as `.csv` or `.pcap`; other extensions are rejected before inference.
+
+### Upload returns HTTP 500
+
+Check the FastAPI terminal for the traceback. Common causes are missing model artifacts, incompatible feature columns, malformed CSV data, or dependencies missing from the active Python environment.
+
+## Reproducibility and future work
+
+The next model iteration should use real timestamp-based windows, retrain with a populated destination-port feature, separate infiltration from the generic attack target, and strengthen the time-based evaluation split so every attack family is represented appropriately in test data. These changes should be accompanied by a new matched checkpoint, scaler, and export bundle.
+
+## License
+
+No license file is currently included in this repository. Add a license before distributing the project outside its intended team or organization.
