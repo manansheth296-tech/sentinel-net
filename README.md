@@ -25,35 +25,50 @@
 
 ```text
 sih26153-network-forecast/
-├── app/
-│   └── streamlit_app.py          # Interactive offline UI dashboard
 ├── backend/
+│   ├── __init__.py
 │   ├── data_prep.py              # Sequence windowing & state vector extraction
 │   ├── engine.py                 # Core inference orchestration & API contract output
 │   ├── explain.py                # SHAP / Feature importance explainability engine
 │   ├── mitre_mapping.py          # Rule-based dataset to MITRE stage mapper
+│   ├── server.py                 # FastAPI REST API server (/api/analyze)
 │   └── train_baseline.py         # Logistic regression baseline & benchmark harness
+├── frontend/
+│   ├── public/                   # Static assets (favicons, SVG icons)
+│   ├── src/
+│   │   ├── api/                  # API client (analyze.js)
+│   │   ├── components/           # UI components (InfiltrationChart, RiskGauge, etc.)
+│   │   ├── context/              # Application & Toast context
+│   │   ├── views/                # Dashboard, LiveAnalysis, Findings, Settings, Profile
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   ├── package.json
+│   ├── vite.config.js            # Vite reverse proxy to FastAPI backend
+│   └── index.html
+├── model/
+│   ├── __init__.py
+│   ├── export_bundle_v4.json     # Serialized model metadata & evaluation stats
+│   ├── inference.py              # PyTorch inference routine
+│   ├── preprocessing.py          # Feature transformation helpers
+│   ├── scaler_v4.pkl             # Pre-fitted 156-dim StandardScaler
+│   ├── world_model_v4_best.pt    # Trained LSTM weights (1.3 MB)
+│   └── README_LSTM_WORLD_MODEL.md
+├── app/
+│   ├── __init__.py
+│   └── streamlit_app.py          # Standalone offline Streamlit UI dashboard
 ├── data/
+│   ├── __init__.py
 │   ├── clean_dataset.py          # Header removal, NaN/Inf handling
 │   ├── convert_to_v4.py          # CIC-IDS-2018 to V4 feature schema alignment
-│   ├── download.py               # Dataset acquisition utility
 │   ├── sample_test.csv           # Pre-validated sample capture for demo runs
 │   ├── raw/                      # Raw capture CSV drop location
 │   └── processed/                # Normalized tensor splits
 ├── docs/
 │   ├── CONTRACT.md               # Strict feature schema & JSON contract definition
 │   ├── DATA_PREPROCESSING.md     # Detailed data engineering manual
-│   └── architecture.md           # 2-Page technical architecture specification
-├── model/
-│   ├── export_bundle_v4.json     # Serialized model metadata
-│   ├── inference.py              # PyTorch inference routine
-│   ├── preprocessing.py          # Feature transformation helpers
-│   ├── scaler_v4.pkl             # Pre-fitted 156-dim StandardScaler
-│   ├── world_model_v4_best.pt    # Trained LSTM weights
-│   ├── README.md                 # Model documentation
-│   └── requirements.txt          # Dedicated model dependencies
+│   └── architecture.md           # Technical architecture specification
 ├── tests/
-│   └── test_data_prep.py         # 39-point unit & integration test suite
+│   └── test_data_prep.py         # Unit & integration test suite
 ├── .gitignore                    # Git ignore file
 ├── requirements.txt              # Unified project dependencies
 └── README.md                     # Repository documentation
@@ -65,24 +80,27 @@ sih26153-network-forecast/
 
 ### 1. Prerequisites
 - Python 3.11+
+- Node.js 18+ & npm
 - Git
 
 ### 2. Installation
 ```bash
 # Clone the repository
-git clone https://github.com/your-team/sih26153-network-forecast.git
+git clone https://github.com/manansheth296-tech/sentinel-net.git
 cd sih26153-network-forecast
 
-# Create and activate virtual environment
+# Create and activate Python virtual environment
 python -m venv .venv
+.venv\Scripts\activate      # Windows
+# source .venv/bin/activate # Linux/macOS
 
-# Windows:
-.venv\Scripts\activate
-# Linux/macOS:
-source .venv/bin/activate
-
-# Install dependencies
+# Install Python dependencies
 pip install -r requirements.txt
+
+# Install Frontend dependencies
+cd frontend
+npm install
+cd ..
 ```
 
 ### 3. Run Preprocessing & Feature Extraction
@@ -99,7 +117,20 @@ python data/clean_dataset.py --input data/raw/03-01-2018_v4.csv
 python -m pytest tests/test_data_prep.py -v
 ```
 
-### 5. Launch Offline Streamlit Demo
+### 5. Launch Full Stack (FastAPI Backend + React Frontend)
+
+**Terminal 1 — Backend (Port 8000):**
+```bash
+uvicorn backend.server:app --host 0.0.0.0 --port 8000 --reload
+```
+
+**Terminal 2 — Frontend (Port 5173):**
+```bash
+cd frontend
+npm run dev
+```
+
+*(Optional) Launch Standalone Streamlit Dashboard:*
 ```bash
 streamlit run app/streamlit_app.py
 ```
