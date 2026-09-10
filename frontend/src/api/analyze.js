@@ -14,8 +14,17 @@ export async function analyzeFile(file) {
   });
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Server error ${response.status}: ${text}`);
+    let errorMsg = `Server error ${response.status}`;
+    try {
+      const errData = await response.json();
+      if (errData && errData.detail) {
+        errorMsg = errData.detail;
+      }
+    } catch {
+      const text = await response.text();
+      if (text) errorMsg = text;
+    }
+    throw new Error(errorMsg);
   }
 
   return response.json();

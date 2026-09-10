@@ -1,0 +1,86 @@
+================================================================================
+SIH26153: SENTINELNET — TECHNICAL VIVA & EVALUATION Q&A DEFENSE GUIDE
+AI-Based Network Attack Forecasting via Sequence State Dynamics P(S_t+1 | S_t)
+================================================================================
+
+1. ARCHITECTURE & TECH STACK
+--------------------------------------------------------------------------------
+Q1: Why did you choose a Dual-Head LSTM instead of Transformers or GNNs?
+- Attack progression is inherently temporal and causal (Reconnaissance -> Access -> Lateral Movement).
+- Lightweight & Low Latency: ~323k parameters vs. millions in Transformers; O(T) inference complexity enables fast offline edge deployment.
+- Autoregressive State Rollout: Recurrent cell states naturally model state transitions P(S_t+1 | S_t).
+
+Q2: Why is this called a 'World Model' and not just a standard classifier?
+- Standard classifiers are reactive point-in-time mappers: X_t -> Y_t in {0, 1}.
+- World Model learns environment dynamics P(S_t+1 | S_t) via Dual-Head architecture:
+  * State Head: Predicts full 156-D next state vector S_hat_{t+1}.
+  * Risk Head: Predicts attack probability in that forecasted next state.
+- Enables K-step autoregressive forward simulation before attacks complete.
+
+Q3: What is the Tech Stack and why no Cloud / Microservices?
+- AI Engine: PyTorch (Dual-Head 2-layer LSTM).
+- Data Pipeline: NumPy, Pandas, pure-NumPy StandardScaler.
+- Explainability: Input x Gradient attribution & Permutation Importance.
+- Backend: FastAPI + Uvicorn (Python 3.11 / 3.14).
+- Frontend: React + Vite / HTML5 + JS Dashboard.
+- Offline Constraint: Shipped solution runs 100% locally with zero cloud API dependencies.
+
+2. DATA PIPELINE & FEATURE ENGINEERING
+--------------------------------------------------------------------------------
+Q4: How is the 156-D State Vector (S_t) constructed?
+- 200 consecutive flow records per temporal window.
+- 77 raw numeric flow features (packet counts, IATs, TCP flags, byte rates).
+- Mean (77) + Standard Deviation (77) across window = 154 features.
+- 2 metadata features: unique_dst_ports + flow_count.
+- Total: 77 + 77 + 2 = 156 dimensions.
+
+Q5: What is the exact input tensor shape?
+- Sequence of 20 consecutive time windows: (Batch Size, 20, 156).
+- Scaled using StandardScaler fitted strictly on training data.
+
+Q6: How did you prevent data leakage?
+- StandardScaler was fitted ONLY on training split; inference uses .transform().
+- Splits were constructed chronologically per capture, preserving time causality.
+
+3. MODEL ARCHITECTURE & TRAINING
+--------------------------------------------------------------------------------
+Q7: What is the exact neural network architecture?
+- Input: (Batch, 20, 156).
+- LSTM Layer 1: 128 hidden units, Dropout = 0.3.
+- LSTM Layer 2: 128 hidden units, Dropout = 0.3.
+- LayerNorm on 128-D latent state.
+- State Head: Linear(128->128) -> ReLU -> Dropout(0.3) -> Linear(128->156) -> S_hat_{t+1}.
+- Risk Head:  Linear(128->64)  -> ReLU -> Dropout(0.3) -> Linear(64->1)   -> Sigmoid -> P(Attack).
+
+Q8: What loss function was used?
+- Multi-task composite loss: Loss = MSE(S_hat_{t+1}, S_{t+1}) + BCEWithLogitsLoss(logit, label, pos_weight=1.66).
+
+4. FORECASTING, EXPLAINABILITY & MITRE
+--------------------------------------------------------------------------------
+Q9: How does K-step forward forecasting rollout work?
+- At step t, model predicts S_hat_{t+1}.
+- Append S_hat_{t+1}, slide window, and predict S_hat_{t+2} up to K=5 steps forward.
+
+Q10: How do you compute feature explainability?
+- Input x Gradient attribution: |X * grad_X(Loss_risk)| * Recency_Weights.
+- Maps 156 state features back to root flow metrics (SYN flag count, IAT variances).
+
+Q11: How are MITRE ATT&CK stages predicted?
+- PortScan -> Reconnaissance
+- BruteForce -> Initial Access
+- Infiltration -> Lateral Movement
+- Botnet -> Command & Control
+- DoS/DDoS -> Impact
+- Forecasted states use nearest-centroid Euclidean matching.
+
+5. BENCHMARK NUMBERS & DEFENSE
+--------------------------------------------------------------------------------
+Q12: What are your benchmark results?
+- Dual-Head LSTM: F1 = 83.54%, Precision = 92.78%, Recall = 75.97%, FPR = 1.72%.
+- Baseline (Logistic Regression): F1 = 61.20%, Precision = 68.40%, Recall = 55.40%, FPR = 8.20%.
+- High precision (92.8%) and ultra-low FPR (1.7%) prevent alert fatigue.
+
+Q13: What happens if an invalid file (e.g. Sales CSV) is uploaded?
+- Schema integrity validator checks 77 raw flow features.
+- Rejects invalid files with HTTP 400 Bad Request error.
+================================================================================

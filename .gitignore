@@ -14,7 +14,10 @@ data/raw/
 *.csv
 *.pcap
 *.parquet
+!data/sample_*.csv
+!data/samples/*.csv
 !data/processed/*.parquet
+data/large_test_upload.csv
 
 # Node / Frontend
 node_modules/

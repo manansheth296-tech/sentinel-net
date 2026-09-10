@@ -36,6 +36,11 @@ export default function DashboardView() {
       fireNotification(data);
     } catch (err) {
       dispatch({ type: "ANALYSIS_ERROR", payload: err.message });
+      addToast({
+        type: "critical",
+        message: err.message,
+        duration: 8000,
+      });
     }
   }
 

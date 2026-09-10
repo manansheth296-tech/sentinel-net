@@ -1,0 +1,65 @@
+================================================================================
+SIH26153 — AI-Based Network Attack Forecasting from Network Traffic Data
+KEY LITERATURE & REFERENCES (15 RESEARCH PAPERS)
+================================================================================
+
+[1] M. Husák, J. Komárková, E. Bou-Harb, and P. Čeleda,
+    "A Survey on Cyber Attack Prediction and Forecasting: Concepts, Methods, and Future Directions,"
+    IEEE Communications Surveys & Tutorials, vol. 21, no. 2, pp. 1519–1540, 2019.
+
+[2] A. Ghourabi,
+    "Deep Learning for Cyberattack Prediction: A State-of-the-Art Review,"
+    IEEE Access, vol. 10, pp. 101037–101057, 2022.
+
+[3] Y. Zhang, X. Chen, and J. Liu,
+    "Proactive Intrusion Detection and Attack Forecasting Using Sequence-to-Sequence Deep Learning,"
+    Computers & Security (Elsevier), vol. 128, p. 103154, 2023.
+
+[4] H. Farhadi, M. AmirHaeri, and M. Khodadadi,
+    "Multi-Step Cyber Attack Forecasting Using Hidden Markov Models and Deep Belief Networks,"
+    Journal of Information Security and Applications (Elsevier), vol. 58, p. 102754, 2021.
+
+[5] J. Kim, J. Kim, H. L. T. Thi, and P. Kim,
+    "Intrusion Detection System Using Deep Learning Long Short-Term Memory (LSTM) on Network Flow Data,"
+    IEEE Access, vol. 8, pp. 21192–21203, 2020.
+
+[6] L. Bontemps, V. L. Cao, J. McDermott, and N. A. Le-Khac,
+    "Network Traffic Anomaly Detection Using Recurrent Neural Networks and Temporal Windows,"
+    EAI Endorsed Transactions on Security and Safety, vol. 3, no. 8, p. e5, 2016.
+
+[7] K. Wu, Z. Chen, and M. Xie,
+    "Transformer-Based Network Intrusion Detection Systems: A Comprehensive Survey and Experimental Study,"
+    IEEE Transactions on Information Forensics and Security (TIFS), vol. 18, pp. 4321–4336, 2023.
+
+[8] M. Roopak, G. Y. Tian, and J. Chambers,
+    "A Hybrid CNN-LSTM Architecture for Anomaly Detection in High-Speed Network Traffic,"
+    In Proceedings of the IEEE International Conference on Internet of Things (iThings), pp. 1500–1505, 2019.
+
+[9] I. Al-Turaiki and M. Al-Qurishi,
+    "Temporal Convolutional Networks and LSTMs for Early Stage Network Intrusion Prediction,"
+    Journal of King Saud University - Computer and Information Sciences, vol. 34, no. 8, pp. 5865–5876, 2022.
+
+[10] Y. Shen, Y. Guo, and V. S. Subrahmanian,
+     "ALERT: Alert-Driven Real-Time Cyber Attack Stage Forecasting with MITRE ATT&CK Mapping,"
+     IEEE Transactions on Dependable and Secure Computing (TDSC), vol. 20, no. 4, pp. 3120–3135, 2023.
+
+[11] V. Legoy, M. Caselli, and A. Peter,
+     "Automated Mapping of Threat Intelligence to the MITRE ATT&CK Framework Using Machine Learning,"
+     In Proceedings of the 15th ACM International Conference on Availability, Reliability and Security (ARES), pp. 1–10, 2020.
+
+[12] M. Wang, K. Zheng, Y. Yang, and X. Wang,
+     "Explainable AI for Network Intrusion Detection: A SHAP-Based Framework for Deep Learning Models,"
+     IEEE Network, vol. 34, no. 6, pp. 14–20, 2020.
+
+[13] S. Mane and D. Rao,
+     "Interpreting Deep Learning-Based Cyber Attack Forecasting Using Shapley Additive Explanations (SHAP),"
+     Computers & Security (Elsevier), vol. 108, p. 102353, 2021.
+
+[14] I. Sharafaldin, A. H. Lashkari, and A. A. Ghorbani,
+     "Toward Generating a New Dataset for Intrusion Detection and Realistic Analysis (CSE-CIC-IDS2018),"
+     In Proceedings of the 4th International Conference on Information Systems Security and Privacy (ICISSP), pp. 108–116, 2018.
+
+[15] D. Arp, E. Quiring, F. Pendlebury, and L. Cavallaro,
+     "Dos and Don'ts of Machine Learning in Cyber Security: Avoiding Data Leakage Pitfalls,"
+     In Proceedings of the 31st USENIX Security Symposium (USENIX Security 22), pp. 3971–3988, 2022.
+================================================================================

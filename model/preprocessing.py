@@ -242,10 +242,20 @@ def build_state_vectors(
             
     d["window_id"] = np.arange(len(d)) // WINDOW_ROWS
 
-    # Ensure all 77 raw model features exist
+    # Check how many valid network flow features exist in the uploaded file
+    matching_cols = [col for col in RAW_FEATURE_NAMES if col in d.columns]
+    if len(matching_cols) < 20:
+        raise ValueError(
+            f"Invalid network traffic capture: Found only {len(matching_cols)} of 77 network flow features. "
+            "The uploaded file does not match the expected CIC-IDS-2018 / CICFlowMeter schema."
+        )
+
+    # Ensure all 77 raw model features exist and are numeric float32
     for col in RAW_FEATURE_NAMES:
         if col not in d.columns:
             d[col] = np.float32(0.0)
+        else:
+            d[col] = pd.to_numeric(d[col], errors="coerce").fillna(0.0).astype(np.float32)
 
     agg_dict = {c: ["mean", "std"] for c in RAW_FEATURE_NAMES}
     grouped = d.groupby("window_id").agg(agg_dict)
@@ -303,6 +313,7 @@ def file_to_scaled_sequence(file_path: str) -> Tuple[np.ndarray, pd.DataFrame]:
         state_vecs = pd.concat([pad_rows, state_vecs], ignore_index=True)
 
     scaler = get_scaler()
-    x_scaled = scaler.transform(state_vecs[FEATURE_COLS]).astype(np.float32)
+    vecs_clean = state_vecs[FEATURE_COLS].replace([np.inf, -np.inf], np.nan).fillna(0.0).clip(-1e9, 1e9).astype(np.float32)
+    x_scaled = scaler.transform(vecs_clean).astype(np.float32)
     last_window = x_scaled[-SEQ_LEN:]
     return last_window, state_vecs
