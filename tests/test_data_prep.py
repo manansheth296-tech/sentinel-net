@@ -555,6 +555,171 @@ class TestBaselineLeakage(unittest.TestCase):
         )
 
 
+
+class TestDetectMetadataCols(unittest.TestCase):
+    """
+    Verify detect_metadata_cols() behaviour, especially the label-column
+    fallback for ``attack_type`` introduced to fix the "Unknown Stage always
+    shown" bug.
+
+    Standard CICFlowMeter / CIC-IDS-2018 CSVs have NO dedicated "Attack Type"
+    or "Category" column — the attack-family name lives directly in `Label`.
+    Before the fix, ``attack_type_col`` was ``None`` for these files, causing
+    ``aggregate_windows()`` to default every window's ``mitre_stage`` to
+    ``"Unknown"``.  After the fix, ``attack_type_col`` falls back to
+    ``label_col`` so the real attack label is used.
+    """
+
+    def _minimal_df(self, label_values, extra_cols: dict = None) -> pd.DataFrame:
+        """Build a tiny DataFrame with 77 model features + a Label column."""
+        rng = np.random.default_rng(0)
+        data = {col: rng.random(len(label_values)).astype(np.float32)
+                for col in RAW_FEATURE_NAMES}
+        data["Label"] = label_values
+        if extra_cols:
+            data.update(extra_cols)
+        return pd.DataFrame(data)
+
+    # ------------------------------------------------------------------
+    # detect_metadata_cols() unit tests
+    # ------------------------------------------------------------------
+
+    def test_label_only_attack_type_equals_label_col(self):
+        """
+        When the CSV has only a `Label` column and no dedicated Attack Type /
+        Category column, ``attack_type_col`` must fall back to ``label_col``.
+        """
+        df = self._minimal_df(["Bot", "Bot", "Benign"])
+        meta = detect_metadata_cols(df)
+        self.assertIsNotNone(meta["label"],
+                             "label_col should be detected from 'Label'.")
+        self.assertEqual(
+            meta["attack_type"], meta["label"],
+            "attack_type should fall back to label_col when no dedicated "
+            "attack-type column exists.",
+        )
+
+    def test_dedicated_attack_type_col_preferred(self):
+        """
+        When the CSV has an explicit 'Attack Type' column, ``attack_type_col``
+        must point to that column, NOT to the label column.
+        """
+        df = self._minimal_df(
+            ["FTP-BruteForce"] * 3,
+            extra_cols={"Attack Type": ["FTP", "FTP", "Benign"]},
+        )
+        meta = detect_metadata_cols(df)
+        self.assertEqual(
+            meta["attack_type"], "Attack Type",
+            "Dedicated 'Attack Type' column should take precedence over Label.",
+        )
+        self.assertNotEqual(
+            meta["attack_type"], meta["label"],
+            "attack_type should NOT fall back to label when a dedicated column exists.",
+        )
+
+    def test_no_label_col_attack_type_is_none(self):
+        """
+        When neither a dedicated attack-type column nor a label column is
+        present, ``attack_type_col`` must be ``None`` (no crash, honest null).
+        """
+        rng = np.random.default_rng(1)
+        df = pd.DataFrame(
+            {col: rng.random(5).astype(np.float32) for col in RAW_FEATURE_NAMES}
+        )
+        meta = detect_metadata_cols(df)
+        self.assertIsNone(meta["label"])
+        self.assertIsNone(meta["attack_type"])
+
+    # ------------------------------------------------------------------
+    # aggregate_windows() integration — mitre_stage must not be "Unknown"
+    # for label-only CICFlowMeter CSVs.
+    # ------------------------------------------------------------------
+
+    def _run_aggregate(self, label_values) -> pd.DataFrame:
+        """
+        Helper: build a minimal df, attach is_attack + window_id, run
+        aggregate_windows() with the fallback-corrected meta, and return
+        the resulting state_df.
+        """
+        df = self._minimal_df(label_values)
+        meta = detect_metadata_cols(df)
+
+        from backend.data_prep import _attach_is_attack, assign_window_ids, aggregate_windows
+        df = _attach_is_attack(df, meta["label"])
+        df = assign_window_ids(df, timestamp_col=None, use_real_time=False)
+        state_df = aggregate_windows(
+            df,
+            dst_port_col=meta["dst_port"],
+            label_col=meta["label"],
+            attack_type_col=meta["attack_type"],   # now == label_col via fallback
+        )
+        return state_df
+
+    def test_bot_label_produces_bot_mitre_stage(self):
+        """
+        A label-only CSV with all rows labelled 'Bot' must produce
+        mitre_stage == 'Bot' (not 'Unknown') after aggregate_windows().
+        The engine then maps 'Bot' → 'Command & Control' via get_mitre_stage().
+        """
+        # One window of WINDOW_ROWS rows all labelled Bot
+        labels = ["Bot"] * WINDOW_ROWS
+        state_df = self._run_aggregate(labels)
+        stages = state_df["mitre_stage"].tolist()
+        self.assertEqual(
+            stages, ["Bot"],
+            f"Expected ['Bot'], got {stages}. "
+            "The attack_type_col fallback may not be working.",
+        )
+
+    def test_mixed_bot_benign_labels(self):
+        """
+        A window with a mix of 'Bot' and 'Benign' rows (majority 'Bot') must
+        produce mitre_stage == 'Bot'.  'Benign' rows are stripped by the
+        _majority_stage() logic before the majority vote.
+        """
+        labels = ["Bot"] * 3 + ["Benign"] * (WINDOW_ROWS - 3)
+        state_df = self._run_aggregate(labels)
+        stages = state_df["mitre_stage"].tolist()
+        self.assertEqual(
+            stages, ["Bot"],
+            f"Expected ['Bot'] for majority-Bot window, got {stages}.",
+        )
+
+    def test_benign_only_label_produces_benign_stage(self):
+        """
+        A label-only CSV where every row is 'Benign' must produce
+        mitre_stage == 'Benign', not 'Unknown'.
+        This also verifies the engine-level mapping to 'Normal Traffic'
+        will work correctly (since get_mitre_stage('Benign') == 'Normal Traffic').
+        """
+        labels = ["Benign"] * WINDOW_ROWS
+        state_df = self._run_aggregate(labels)
+        stages = state_df["mitre_stage"].tolist()
+        self.assertEqual(
+            stages, ["Benign"],
+            f"Expected ['Benign'] for all-benign window, got {stages}.",
+        )
+
+    def test_ftp_bruteforce_label_not_unknown(self):
+        """
+        A label-only CSV with 'FTP-BruteForce' rows must NOT produce 'Unknown'
+        in mitre_stage; the label must pass through intact so get_mitre_stage()
+        can map it to 'Initial Access'.
+        """
+        labels = ["FTP-BruteForce"] * WINDOW_ROWS
+        state_df = self._run_aggregate(labels)
+        stages = state_df["mitre_stage"].tolist()
+        self.assertNotIn(
+            "Unknown", stages,
+            f"Expected no 'Unknown' stage for FTP-BruteForce labels; got {stages}.",
+        )
+        self.assertEqual(
+            stages, ["FTP-BruteForce"],
+            f"Expected ['FTP-BruteForce'], got {stages}.",
+        )
+
+
 # ---------------------------------------------------------------------------
 # Allow `python tests/test_data_prep.py` as well as `pytest`
 # ---------------------------------------------------------------------------

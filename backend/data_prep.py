@@ -300,13 +300,31 @@ def detect_metadata_cols(df: pd.DataFrame) -> dict:
     """
     Auto-detect optional metadata columns present in the dataframe.
     Returns a dict of role -> column_name (or None).
+
+    ``attack_type`` falls back to the ``label`` column when no dedicated
+    "Attack Type" / "Category" column is present.  Standard CICFlowMeter /
+    CIC-IDS-2018 CSVs (including this repo's sample files) only have a single
+    ``Label`` column that already carries the attack-family name directly
+    (``Bot``, ``FTP-BruteForce``, ``PortScan``, ``Benign``, …).  Without this
+    fallback, ``aggregate_windows()`` would receive ``attack_type_col=None``
+    and default every window's ``mitre_stage`` to ``"Unknown"``, making the
+    rule-based MITRE stage always show ``"Unknown Stage"`` in the frontend.
+
+    Safety: ``_majority_stage()`` in ``aggregate_windows()`` already strips
+    ``"benign"`` values before picking a majority label, and
+    ``get_mitre_stage()`` already returns ``"Unknown Stage"`` for any string
+    not found in ``MITRE_STAGE_MAP`` — so this fallback cannot produce a
+    wrong-but-confident answer for unrecognised label strings.
     """
+    label_col = _find_col(df.columns, ["label"])
+    attack_type_col = _find_col(df.columns, ["attack type", "attack_type",
+                                              "category", "sub label", "sub-label"])
     return {
-        "label":       _find_col(df.columns, ["label"]),
+        "label":       label_col,
         "timestamp":   _find_col(df.columns, ["timestamp", "time stamp", "time_stamp"]),
         "dst_port":    _find_col(df.columns, ["dst port", "destination port"]),
-        "attack_type": _find_col(df.columns, ["attack type", "attack_type",
-                                               "category", "sub label", "sub-label"]),
+        # Fall back to the label column when no dedicated attack-type column exists.
+        "attack_type": attack_type_col if attack_type_col is not None else label_col,
         "src_ip":      _find_col(df.columns, ["src ip", "source ip"]),
         "dst_ip":      _find_col(df.columns, ["dst ip", "destination ip"]),
         "flow_id":     _find_col(df.columns, ["flow id", "flow_id"]),
