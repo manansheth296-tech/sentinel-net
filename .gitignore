@@ -23,6 +23,7 @@ data/large_test_upload.csv
 node_modules/
 dist/
 dist-ssr/
-.vite/
-*.local
+# Archives
+*.zip
+
 

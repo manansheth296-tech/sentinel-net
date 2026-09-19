@@ -255,12 +255,23 @@ def build_state_vectors(
         if col not in d.columns:
             d[col] = np.float32(0.0)
         else:
-            d[col] = pd.to_numeric(d[col], errors="coerce").fillna(0.0).astype(np.float32)
+            d[col] = (
+                pd.to_numeric(d[col], errors="coerce")
+                .replace([np.inf, -np.inf], np.nan)
+                .fillna(0.0)
+                .clip(-1e9, 1e9)
+                .astype(np.float32)
+            )
 
     agg_dict = {c: ["mean", "std"] for c in RAW_FEATURE_NAMES}
     grouped = d.groupby("window_id").agg(agg_dict)
     grouped.columns = ["_".join(c) for c in grouped.columns]
-    grouped = grouped.fillna(0.0).astype(np.float32)
+    grouped = (
+        grouped.replace([np.inf, -np.inf], np.nan)
+        .fillna(0.0)
+        .clip(-1e9, 1e9)
+        .astype(np.float32)
+    )
 
     if dst_port_col is not None and dst_port_col in d.columns and not _ALWAYS_ZERO_PORT_FEATURE:
         grouped["unique_dst_ports"] = d.groupby("window_id")[dst_port_col].nunique().astype(np.float32)
@@ -277,6 +288,14 @@ def build_state_vectors(
     for col in FEATURE_COLS:
         if col not in grouped.columns:
             grouped[col] = np.float32(0.0)
+        else:
+            grouped[col] = (
+                pd.to_numeric(grouped[col], errors="coerce")
+                .replace([np.inf, -np.inf], np.nan)
+                .fillna(0.0)
+                .clip(-1e9, 1e9)
+                .astype(np.float32)
+            )
 
     return grouped.sort_index().reset_index(drop=True)
 
@@ -285,8 +304,14 @@ def clean_and_prepare(raw: pd.DataFrame, label_col: str, numeric_cols: List[str]
     """Inf -> NaN -> 0, cast to float32, attach is_attack."""
     raw = raw.copy()
     for c in numeric_cols:
-        raw[c] = pd.to_numeric(raw[c], errors="coerce").astype(np.float32)
-    raw[numeric_cols] = raw[numeric_cols].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        raw[c] = pd.to_numeric(raw[c], errors="coerce")
+    raw[numeric_cols] = (
+        raw[numeric_cols]
+        .replace([np.inf, -np.inf], np.nan)
+        .fillna(0.0)
+        .clip(-1e9, 1e9)
+        .astype(np.float32)
+    )
     
     if label_col in raw.columns:
         raw["is_attack"] = (raw[label_col].astype(str).str.lower() != "benign").astype(int)
@@ -313,7 +338,15 @@ def file_to_scaled_sequence(file_path: str) -> Tuple[np.ndarray, pd.DataFrame]:
         state_vecs = pd.concat([pad_rows, state_vecs], ignore_index=True)
 
     scaler = get_scaler()
-    vecs_clean = state_vecs[FEATURE_COLS].replace([np.inf, -np.inf], np.nan).fillna(0.0).clip(-1e9, 1e9).astype(np.float32)
+    vecs_clean = (
+        state_vecs[FEATURE_COLS]
+        .replace([np.inf, -np.inf], np.nan)
+        .fillna(0.0)
+        .clip(-1e9, 1e9)
+        .astype(np.float32)
+    )
     x_scaled = scaler.transform(vecs_clean).astype(np.float32)
+    x_scaled = np.nan_to_num(x_scaled, nan=0.0, posinf=0.0, neginf=0.0)
     last_window = x_scaled[-SEQ_LEN:]
     return last_window, state_vecs
+

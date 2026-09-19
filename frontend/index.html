@@ -1,21 +1,65 @@
-<!doctype html>
-<html lang="en" class="dark">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="SentinelNet — Network Attack Forecasting Dashboard" />
-    <meta name="theme-color" content="#0B0F1A" />
-    <title>SentinelNet</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SentinelNet — Network Attack-Risk Monitoring</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+
+<div class="status-strip">
+  <span><strong>Status:</strong> Prototype / benchmark checkpoint — generic attack-risk model, not an infiltration-specific classifier.</span>
+  <span id="status-strip-meta">SIH_LSTM_V4 · model2/ (canonical)</span>
+</div>
+
+<header class="app-header">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">SN</span>
+    <div class="brand-text">
+      <span class="brand-title">SentinelNet</span>
+      <span class="brand-subtitle">Network attack-risk monitoring &amp; forecasting</span>
+    </div>
+  </div>
+  <div class="header-status" id="header-status" role="status" aria-live="polite">
+    <span class="status-dot" id="status-dot"></span>
+    <span id="status-text">checking backend…</span>
+  </div>
+</header>
+
+<div class="app-shell">
+  <nav class="side-nav" aria-label="Primary navigation">
+    <ul>
+      <li><button class="nav-link active" data-page="dashboard">Dashboard</button></li>
+      <li><button class="nav-link" data-page="traffic">Traffic Analysis</button></li>
+      <li><button class="nav-link" data-page="forecast">Forecast</button></li>
+      <li><button class="nav-link" data-page="mitre">MITRE ATT&amp;CK</button></li>
+      <li><button class="nav-link" data-page="flows">Network Flows</button></li>
+      <li><button class="nav-link" data-page="shap">SHAP Explainability</button></li>
+      <li><button class="nav-link" data-page="performance">Model Performance</button></li>
+      <li><button class="nav-link" data-page="technical">Technical Details</button></li>
+      <li><button class="nav-link" data-page="report">Report</button></li>
+    </ul>
+    <div class="side-nav-footer">
+      <span class="prototype-badge">Prototype / benchmark checkpoint</span>
+    </div>
+  </nav>
+
+  <main id="main-content" class="content" tabindex="-1">
+    <div class="breadcrumb" id="breadcrumb">Dashboard</div>
+    <div id="page-root"></div>
+  </main>
+</div>
+
+<template id="tpl-empty-state">
+  <div class="panel empty-state">
+    <h2>No analysis available</h2>
+    <p>Upload a supported network flow dataset (CSV or Parquet) on the <strong>Traffic Analysis</strong> page to begin.</p>
+  </div>
+</template>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
 </html>

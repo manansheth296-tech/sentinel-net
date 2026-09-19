@@ -1,0 +1,408 @@
+/* ==========================================================================
+   SentinelNet — visual identity
+   ---------------------------------------------------------------------
+   Grounded in the vernacular of an operations-center case file / official
+   incident record rather than a generic SaaS dashboard: hairline rules
+   instead of drop shadows, a serif document hand for headings against a
+   plain sans for interface chrome, monospace reserved strictly for actual
+   data readouts (probabilities, ports, IPs), and a status strip at the
+   top the way government and monitoring tools post standing notices.
+   ========================================================================== */
+
+:root {
+  --ink-950: #0a1220;
+  --ink-900: #101a2c;
+  --ink-800: #182642;
+  --ink-700: #26385c;
+  --hairline: #cdd4e0;
+  --hairline-strong: #9aa7bc;
+  --paper: #f2f3f0;
+  --paper-raised: #ffffff;
+  --ink: #10151f;
+  --ink-soft: #4b5568;
+  --on-dark: #dfe6f2;
+  --on-dark-soft: #8fa0bd;
+
+  --signal-red: #a02c22;
+  --signal-red-bg: #f7e9e6;
+  --signal-amber: #8a5a12;
+  --signal-amber-bg: #f4ecd8;
+  --signal-green: #2c5f3f;
+  --signal-green-bg: #e7efe6;
+  --signal-blue: #24507f;
+  --signal-blue-bg: #e6ecf3;
+  --signal-grey: #5c6472;
+  --signal-grey-bg: #eaebe6;
+
+  --accent: #3f7d78;
+  --accent-dark: #2a5b57;
+
+  --serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  --sans: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.skip-link {
+  position: absolute;
+  left: -999px;
+  top: 0;
+  background: var(--ink-950);
+  color: #fff;
+  padding: 8px 14px;
+  z-index: 1000;
+}
+.skip-link:focus { left: 8px; top: 8px; }
+
+button, input, select { font-family: inherit; }
+button { cursor: pointer; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------
+   Status strip — a standing operational notice, the way a monitoring
+   console posts build/version/status information, not a decoration.
+   --------------------------------------------------------------------- */
+.status-strip {
+  background: var(--signal-amber-bg);
+  color: var(--signal-amber);
+  border-bottom: 1px solid var(--hairline-strong);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 6px 24px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.status-strip strong { font-weight: 700; }
+
+/* ---------------------------------------------------------------------
+   Header
+   --------------------------------------------------------------------- */
+.app-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  background: var(--ink-950);
+  color: var(--on-dark);
+  padding: 16px 24px 14px;
+  border-bottom: 1px solid var(--ink-700);
+}
+.brand { display: flex; align-items: baseline; gap: 14px; }
+.brand-mark {
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 22px;
+  color: var(--on-dark);
+  border: 1px solid var(--on-dark-soft);
+  padding: 2px 8px;
+  line-height: 1.2;
+}
+.brand-text { display: flex; flex-direction: column; }
+.brand-title { font-family: var(--serif); font-size: 21px; letter-spacing: 0.01em; }
+.brand-subtitle { font-size: 12.5px; color: var(--on-dark-soft); margin-top: 2px; }
+
+.header-status {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono);
+  font-size: 12px; color: var(--on-dark-soft);
+}
+.status-dot {
+  width: 8px; height: 8px;
+  background: var(--signal-grey);
+  display: inline-block;
+}
+.status-dot.ok { background: #5fae86; }
+.status-dot.bad { background: #c76a5c; }
+
+/* ---------------------------------------------------------------------
+   Shell / navigation
+   --------------------------------------------------------------------- */
+.app-shell { display: flex; min-height: calc(100vh - 110px); }
+
+.side-nav {
+  width: 216px;
+  flex-shrink: 0;
+  background: var(--ink-900);
+  color: var(--on-dark);
+  border-right: 1px solid var(--ink-700);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 4px 0 16px;
+}
+.side-nav ul { list-style: none; margin: 0; padding: 0; }
+.nav-link {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-left: 2px solid transparent;
+  color: var(--on-dark-soft);
+  padding: 10px 20px;
+  font-size: 13.5px;
+}
+.nav-link:hover { background: var(--ink-800); color: var(--on-dark); }
+.nav-link.active {
+  background: var(--ink-800);
+  color: #fff;
+  border-left-color: var(--accent);
+  font-weight: 600;
+}
+.side-nav-footer { padding: 14px 20px 0; border-top: 1px solid var(--ink-700); margin-top: 12px; }
+.prototype-badge {
+  display: block;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--on-dark-soft);
+}
+
+.content {
+  flex: 1;
+  padding: 26px 34px 60px;
+  max-width: 1160px;
+}
+.breadcrumb {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* ---------------------------------------------------------------------
+   Typography
+   --------------------------------------------------------------------- */
+h1 {
+  font-family: var(--serif);
+  font-size: 25px;
+  font-weight: 400;
+  margin: 0 0 6px;
+  color: var(--ink-950);
+}
+h2 {
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 12px;
+  color: var(--ink-950);
+}
+h3 { font-size: 13.5px; font-weight: 700; margin: 0 0 8px; }
+.page-lede { color: var(--ink-soft); margin-bottom: 20px; font-size: 14px; max-width: 68ch; }
+
+/* ---------------------------------------------------------------------
+   Panels — hairline document sections, not floating cards
+   --------------------------------------------------------------------- */
+.panel {
+  background: var(--paper-raised);
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  padding: 20px 22px;
+  margin-bottom: 18px;
+}
+
+/* Dashboard stat strip: a ledger row, not a grid of identical tiles */
+.stat-strip {
+  display: flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--hairline);
+  background: var(--paper-raised);
+  margin-bottom: 18px;
+}
+.stat-cell {
+  flex: 1 1 160px;
+  padding: 16px 18px;
+  border-right: 1px solid var(--hairline);
+  border-top: 3px solid var(--ink-700);
+}
+.stat-cell:last-child { border-right: none; }
+.stat-cell.risk-high { border-top-color: var(--signal-red); }
+.stat-cell.risk-medium { border-top-color: var(--signal-amber); }
+.stat-cell.risk-low { border-top-color: var(--signal-green); }
+.stat-label {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-bottom: 8px;
+}
+.stat-value {
+  font-family: var(--mono);
+  font-size: 23px;
+  font-weight: 700;
+  color: var(--ink-950);
+}
+.stat-sub { font-size: 11.5px; color: var(--ink-soft); margin-top: 5px; }
+
+/* fallback grid used sparingly outside the dashboard hero */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0;
+  border: 1px solid var(--hairline);
+  margin-bottom: 18px;
+  background: var(--paper-raised);
+}
+.metric-card {
+  padding: 16px 18px;
+  border-right: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+}
+.metric-label { font-size: 12px; color: var(--ink-soft); margin-bottom: 8px; }
+.metric-value { font-family: var(--mono); font-size: 22px; font-weight: 700; }
+.metric-sub { font-size: 12px; color: var(--ink-soft); margin-top: 5px; }
+
+/* ---------------------------------------------------------------------
+   Status tags — square swatch + label, not colored pill badges
+   --------------------------------------------------------------------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 2px 0;
+}
+.badge::before {
+  content: "";
+  width: 9px; height: 9px;
+  display: inline-block;
+}
+.badge-red::before { background: var(--signal-red); }
+.badge-amber::before { background: var(--signal-amber); }
+.badge-green::before { background: var(--signal-green); }
+.badge-grey::before { background: var(--signal-grey); }
+.badge-blue::before { background: var(--signal-blue); }
+.badge-red { color: var(--signal-red); }
+.badge-amber { color: var(--signal-amber); }
+.badge-green { color: var(--signal-green); }
+.badge-grey { color: var(--signal-grey); }
+.badge-blue { color: var(--signal-blue); }
+
+/* ---------------------------------------------------------------------
+   Tables — the primary data surface
+   --------------------------------------------------------------------- */
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--hairline); }
+th {
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--hairline-strong);
+}
+td { font-variant-numeric: tabular-nums; }
+tbody tr:hover { background: #f8f8f5; }
+.table-scroll { overflow-x: auto; }
+
+/* ---------------------------------------------------------------------
+   Bars (SHAP / temporal importance)
+   --------------------------------------------------------------------- */
+.bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+.bar-label { width: 190px; flex-shrink: 0; font-size: 13px; }
+.bar-track { flex: 1; background: #eceee9; height: 12px; }
+.bar-fill { height: 100%; background: var(--accent); }
+.bar-fill.negative { background: var(--signal-red); }
+.bar-value { width: 64px; text-align: right; font-family: var(--mono); font-size: 12px; color: var(--ink-soft); }
+
+/* ---------------------------------------------------------------------
+   Upload zone
+   --------------------------------------------------------------------- */
+.upload-zone {
+  border: 1px dashed var(--hairline-strong);
+  padding: 34px 30px;
+  text-align: center;
+  background: #fbfbf9;
+}
+.upload-zone input[type=file] { margin-top: 12px; font-size: 13.5px; }
+
+.btn {
+  display: inline-block;
+  padding: 9px 20px;
+  border-radius: 2px;
+  border: 1px solid var(--accent-dark);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.btn:hover { background: var(--accent-dark); }
+.btn:disabled { background: #e4e5e0; color: var(--ink-soft); border-color: var(--hairline); cursor: not-allowed; }
+.btn-secondary { background: var(--paper-raised); color: var(--ink-950); border: 1px solid var(--hairline-strong); }
+.btn-secondary:hover { background: #ececea; }
+
+/* ---------------------------------------------------------------------
+   Alerts — left rule, not filled rounded boxes
+   --------------------------------------------------------------------- */
+.alert {
+  padding: 11px 16px;
+  font-size: 13.5px;
+  margin-bottom: 16px;
+  border-left: 3px solid;
+  background: var(--paper-raised);
+  border-top: 1px solid var(--hairline);
+  border-right: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+}
+.alert-error { border-left-color: var(--signal-red); color: var(--signal-red); }
+.alert-warn { border-left-color: var(--signal-amber); color: var(--signal-amber); }
+.alert-info { border-left-color: var(--signal-blue); color: var(--signal-blue); }
+
+.empty-state { text-align: center; padding: 48px 20px; color: var(--ink-soft); }
+.empty-state h2 { color: var(--ink-950); }
+
+.loading-state { padding: 26px 4px; }
+.loading-line { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-family: var(--mono); font-size: 13px; color: var(--ink-soft); }
+.spinner {
+  width: 14px; height: 14px;
+  border: 2px solid var(--hairline);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2s; }
+}
+
+.limitations-list { font-size: 13px; color: var(--ink-soft); padding-left: 18px; }
+.limitations-list li { margin-bottom: 7px; }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.timeline-svg-wrap { overflow-x: auto; }
+
+.feature-detail { border-top: 1px solid var(--hairline); padding-top: 12px; margin-top: 10px; font-size: 13.5px; }
+.feature-detail dt { color: var(--ink-soft); font-size: 11.5px; margin-top: 8px; }
+.feature-detail dd { margin: 2px 0 0; font-family: var(--mono); }
+
+.report-actions { margin-top: 14px; }
+
+@media (max-width: 900px) {
+  .app-shell { flex-direction: column; }
+  .side-nav { width: 100%; flex-direction: row; overflow-x: auto; padding: 4px 0; }
+  .side-nav ul { display: flex; }
+  .nav-link { white-space: nowrap; border-left: none; border-bottom: 2px solid transparent; }
+  .nav-link.active { border-left-color: transparent; border-bottom-color: var(--accent); }
+  .side-nav-footer { display: none; }
+  .content { padding: 18px; }
+  .two-col { grid-template-columns: 1fr; }
+  .bar-label { width: 120px; }
+  .stat-cell { border-right: none; border-bottom: 1px solid var(--hairline); }
+}

@@ -1,3 +1,4 @@
+import argparse
 import os
 import glob
 import pandas as pd
@@ -36,8 +37,34 @@ def load_and_preprocess_clean(data_dir, sample_frac=0.05):
     return X, y, feature_cols
 
 def main():
-    data_dir = r"m:\SIH_2026\sih26153-network-forecast\data\raw"
-    X, y, feature_cols = load_and_preprocess_clean(data_dir, sample_frac=0.05)
+    parser = argparse.ArgumentParser(description="Leakage-free logistic regression baseline for SentinelNet")
+    parser.add_argument(
+        "--data-dir",
+        default=os.environ.get("SENTINELNET_RAW_DATA_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "raw")),
+        help="Directory containing raw CIC-IDS-2018-style CSV files. "
+             "Defaults to $SENTINELNET_RAW_DATA_DIR or <repo>/data/raw.",
+    )
+    parser.add_argument("--sample-frac", type=float, default=0.05)
+    parser.add_argument(
+        "--output-json",
+        default=None,
+        help="Optional path to write the resulting benchmark numbers as JSON "
+             "so the frontend/API can display a real baseline instead of "
+             "'not available'.",
+    )
+    args = parser.parse_args()
+
+    if not os.path.isdir(args.data_dir):
+        raise SystemExit(
+            f"Data directory not found: {args.data_dir}\n"
+            "Pass --data-dir, or set SENTINELNET_RAW_DATA_DIR, to a folder of "
+            "raw CIC-IDS-2018-style CSV files. This script is never invoked "
+            "automatically by the API/dashboard — recorded benchmark values "
+            "are used there until you run this manually."
+        )
+
+    data_dir = args.data_dir
+    X, y, feature_cols = load_and_preprocess_clean(data_dir, sample_frac=args.sample_frac)
     
     print(f"Features used ({len(feature_cols)} cols): {feature_cols[:5]} ...")
     
@@ -69,6 +96,14 @@ def main():
     print(f"Recall:    {rec:.4f}")
     print(f"FPR:       {fpr:.4f}")
     print("==============================================")
+
+    if args.output_json:
+        import json
+        result = {"f1": float(f1), "precision": float(prec), "recall": float(rec), "fpr": float(fpr),
+                   "data_dir": data_dir, "sample_frac": args.sample_frac}
+        with open(args.output_json, "w") as f:
+            json.dump(result, f, indent=2)
+        print(f"Wrote benchmark JSON to {args.output_json}")
 
 if __name__ == "__main__":
     main()
