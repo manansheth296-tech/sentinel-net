@@ -320,6 +320,11 @@ async function handleAnalyze(file) {
     const result = await apiAnalyze(file);
     state.analysis = result;
     state.analyzeError = null;
+    // Show high-risk popup if attack_risk_probability >= 0.70
+    const prob = result?.prediction?.attack_risk_probability ?? null;
+    if (prob !== null && prob >= 0.70) {
+      showHighRiskAlert(result);
+    }
   } catch (e) {
     state.analysis = null;
     state.analyzeError = e.message;
@@ -327,6 +332,126 @@ async function handleAnalyze(file) {
     state.analyzing = false;
     renderCurrentPage();
   }
+}
+
+// ---------------------------------------------------------------------
+// High-Risk Alert Popup
+// ---------------------------------------------------------------------
+function showHighRiskAlert(result) {
+  // Remove any existing popup first
+  dismissHighRiskAlert(true);
+
+  const prob      = result?.prediction?.attack_risk_probability ?? 0;
+  const pctText   = `${(prob * 100).toFixed(1)}%`;
+  const stage     = result?.current_context?.rule_based_mitre_stage ?? "Unknown Stage";
+  const predicted = result?.prediction?.predicted_attack;
+  const filename  = state.sourceFileName || "uploaded file";
+
+  const overlay = document.createElement("div");
+  overlay.id = "risk-alert-overlay";
+  overlay.setAttribute("role", "alertdialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-labelledby", "risk-alert-title");
+
+  const popup = document.createElement("div");
+  popup.id = "risk-alert-popup";
+
+  // Header
+  const header = document.createElement("div");
+  header.id = "risk-alert-header";
+  const icon = document.createElement("span");
+  icon.className = "risk-alert-icon";
+  icon.setAttribute("aria-hidden", "true");
+  const title = document.createElement("h2");
+  title.id = "risk-alert-title";
+  title.textContent = "⚠ High-Risk Threat Detected";
+  header.appendChild(icon);
+  header.appendChild(title);
+
+  // Body
+  const body = document.createElement("div");
+  body.id = "risk-alert-body";
+
+  const pctEl = document.createElement("div");
+  pctEl.className = "risk-pct";
+  pctEl.textContent = pctText;
+
+  const pctSub = document.createElement("div");
+  pctSub.className = "risk-pct-sub";
+  pctSub.textContent = `Attack risk probability · ${filename}`;
+
+  const detailRow = document.createElement("div");
+  detailRow.className = "risk-detail-row";
+
+  function detailItem(label, value) {
+    const item = document.createElement("div");
+    item.className = "risk-detail-item";
+    const lbl = document.createElement("div");
+    lbl.className = "risk-detail-label";
+    lbl.textContent = label;
+    const val = document.createElement("div");
+    val.className = "risk-detail-value";
+    val.textContent = value;
+    item.appendChild(lbl);
+    item.appendChild(val);
+    return item;
+  }
+  detailRow.appendChild(detailItem("MITRE Stage", stage));
+  detailRow.appendChild(detailItem("Classification", predicted ? "Attack predicted" : "Predicted benign"));
+
+  const msg = document.createElement("p");
+  msg.className = "risk-msg";
+  msg.textContent = "The model assigns a risk score above 70%. Review Key Findings for a plain-language summary and recommended actions.";
+
+  body.appendChild(pctEl);
+  body.appendChild(pctSub);
+  body.appendChild(detailRow);
+  body.appendChild(msg);
+
+  // Actions
+  const actions = document.createElement("div");
+  actions.id = "risk-alert-actions";
+
+  const btnDismiss = document.createElement("button");
+  btnDismiss.className = "btn-dismiss";
+  btnDismiss.id = "risk-alert-dismiss-btn";
+  btnDismiss.textContent = "Dismiss";
+  btnDismiss.addEventListener("click", () => dismissHighRiskAlert());
+
+  const btnView = document.createElement("button");
+  btnView.className = "btn-view";
+  btnView.id = "risk-alert-findings-btn";
+  btnView.textContent = "View Key Findings →";
+  btnView.addEventListener("click", () => { dismissHighRiskAlert(); navigate("findings"); });
+
+  actions.appendChild(btnDismiss);
+  actions.appendChild(btnView);
+
+  popup.appendChild(header);
+  popup.appendChild(body);
+  popup.appendChild(actions);
+  overlay.appendChild(popup);
+  document.body.appendChild(overlay);
+
+  // Close on backdrop click (but not popup click)
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) dismissHighRiskAlert(); });
+
+  // Close on Escape
+  function onKey(e) {
+    if (e.key === "Escape") { dismissHighRiskAlert(); document.removeEventListener("keydown", onKey); }
+  }
+  document.addEventListener("keydown", onKey);
+
+  // Focus the dismiss button for keyboard users
+  setTimeout(() => btnDismiss.focus(), 50);
+}
+
+function dismissHighRiskAlert(immediate) {
+  const overlay = document.getElementById("risk-alert-overlay");
+  if (!overlay) return;
+  if (immediate) { overlay.remove(); return; }
+  overlay.classList.add("closing");
+  overlay.addEventListener("animationend", () => overlay.remove(), { once: true });
 }
 
 // ---------------------------------------------------------------------
