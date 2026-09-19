@@ -298,9 +298,7 @@ def run_inference(file_path: str) -> Dict:
     # 4. Historical stage (rule-based, honestly labeled) + rule-based MITRE lookup
     recent_stage_info = _majority_recent_stage(state_vecs)
     dataset_style_label = recent_stage_info["stage"]
-    mitre_lookup = get_mitre_stage(dataset_style_label) if dataset_style_label not in ("Unknown", "Benign") else (
-        "Normal Traffic" if dataset_style_label == "Benign" else "Unknown Stage"
-    )
+    mitre_lookup = get_mitre_stage(dataset_style_label)
 
     # 5. Explainability — real SHAP where the session supports it
     background_sequences = _build_background_sequences(all_scaled, seq_len, last_window)

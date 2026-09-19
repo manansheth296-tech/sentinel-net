@@ -280,9 +280,28 @@ def build_state_vectors(
 
     grouped["is_attack"] = d.groupby("window_id")["is_attack"].max()
     grouped["flow_count"] = d.groupby("window_id").size().astype(np.float32)
-    grouped["mitre_stage"] = grouped.apply(
-        lambda row: stage_from_filename(file_tag, row["is_attack"]), axis=1
-    )
+
+    if label_col and label_col in d.columns:
+        def _compute_stage(row):
+            w_id = row.name
+            is_atk = int(row["is_attack"])
+            if not is_atk:
+                return "Benign"
+            sub = d[d["window_id"] == w_id]
+            atk_sub = sub[sub["is_attack"] == 1]
+            if not atk_sub.empty and label_col in atk_sub:
+                labels = atk_sub[label_col].dropna().astype(str).str.strip()
+                if not labels.empty:
+                    lbl = labels.mode().iloc[0]
+                    if lbl and lbl.lower() != "benign":
+                        return lbl
+            return stage_from_filename(file_tag, is_atk)
+
+        grouped["mitre_stage"] = grouped.apply(_compute_stage, axis=1)
+    else:
+        grouped["mitre_stage"] = grouped.apply(
+            lambda row: stage_from_filename(file_tag, row["is_attack"]), axis=1
+        )
     grouped["source_file"] = file_tag
 
     for col in FEATURE_COLS:
