@@ -385,6 +385,10 @@ tbody tr:hover { background: #f8f8f5; }
 .limitations-list { font-size: 13px; color: var(--ink-soft); padding-left: 18px; }
 .limitations-list li { margin-bottom: 7px; }
 
+/* Key Findings checklist — ordered list for the defense steps */
+.findings-checklist { font-size: 13.5px; padding-left: 22px; margin: 8px 0 0; }
+.findings-checklist li { margin-bottom: 10px; line-height: 1.5; }
+
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .timeline-svg-wrap { overflow-x: auto; }
 
@@ -393,6 +397,14 @@ tbody tr:hover { background: #f8f8f5; }
 .feature-detail dd { margin: 2px 0 0; font-family: var(--mono); }
 
 .report-actions { margin-top: 14px; }
+
+/* Key Findings action row — two export buttons side by side */
+.findings-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
 
 @media (max-width: 900px) {
   .app-shell { flex-direction: column; }
@@ -406,3 +418,79 @@ tbody tr:hover { background: #f8f8f5; }
   .bar-label { width: 120px; }
   .stat-cell { border-right: none; border-bottom: 1px solid var(--hairline); }
 }
+
+/* ==========================================================================
+   Print / Save-as-PDF layout for the Key Findings page
+   Only #findings-print-area and its content is shown; all navigation,
+   the header, the status strip, breadcrumb, and the action buttons are hidden.
+   ========================================================================== */
+@media print {
+  /* Hide everything that is not the print area */
+  .status-strip,
+  .app-header,
+  .side-nav,
+  .breadcrumb,
+  .findings-actions,
+  .skip-link {
+    display: none !important;
+  }
+
+  /* Let the print area fill the full page width */
+  .app-shell {
+    display: block;
+  }
+  .content {
+    padding: 0;
+    max-width: 100%;
+  }
+
+  /* h1 / lede that sit above the print-area still print — keep them */
+  h1, .page-lede { display: block !important; }
+
+  /* Hide everything in #page-root that is NOT inside #findings-print-area */
+  #page-root > *:not(h1):not(.page-lede):not(#findings-print-area) {
+    display: none !important;
+  }
+
+  /* Print area itself: full width, light background, no border radius */
+  #findings-print-area {
+    display: block;
+    width: 100%;
+  }
+
+  /* Panels: no box shadow bleed, simple border, page-break friendly */
+  #findings-print-area .panel {
+    border: 1px solid #bbb;
+    border-radius: 0;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin-bottom: 12pt;
+  }
+
+  /* Stat strip: stack cells vertically so they don't overflow narrow paper */
+  #findings-print-area .stat-strip {
+    display: block;
+    border: 1px solid #bbb;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  #findings-print-area .stat-cell {
+    border-right: none;
+    border-bottom: 1px solid #ccc;
+  }
+
+  /* Alert boxes: left-rule colour is fine, just make sure background is white */
+  #findings-print-area .alert {
+    background: #fff !important;
+  }
+
+  /* Ensure text is readable at print resolution */
+  body {
+    font-size: 11pt;
+    color: #000;
+    background: #fff;
+  }
+  h1 { font-size: 18pt; }
+  h2 { font-size: 13pt; }
+}
+
