@@ -21,6 +21,7 @@ const state = {
 
 const PAGE_TITLES = {
   dashboard: "Dashboard",
+  findings: "Key Findings",
   traffic: "Traffic Analysis",
   forecast: "Forecast",
   mitre: "MITRE ATT&CK",
@@ -98,6 +99,7 @@ function renderCurrentPage() {
   root.innerHTML = "";
   const renderers = {
     dashboard: renderDashboard,
+    findings: renderFindings,
     traffic: renderTraffic,
     forecast: renderForecast,
     mitre: renderMitre,
@@ -744,4 +746,267 @@ function downloadReport() {
 }
 
 // ---------------------------------------------------------------------
+// Key Findings  — plain-language summary for a non-technical reader
+// ---------------------------------------------------------------------
+
+/*
+ * MITRE_PLAIN — a frontend-only lookup keyed by the five stages defined in
+ * backend/mitre_mapping.py, plus Normal Traffic and a default fallback.
+ * Each entry has:
+ *   description  — one sentence explaining what that stage means in an attack
+ *   steps        — 3-5 concrete, manager-friendly defensive actions
+ */
+const MITRE_PLAIN = {
+  "Reconnaissance": {
+    description: "Someone appears to be probing your network — scanning for open doors, weak spots, or services they can exploit later.",
+    steps: [
+      "Block or rate-limit the source IP(s) showing scanning behaviour at your firewall.",
+      "Review which services and ports are publicly reachable and close anything that doesn't need to be open.",
+      "Check server and firewall logs for the same IP appearing in earlier sessions.",
+      "Alert your IT or security team so they can watch for a follow-up intrusion attempt.",
+    ],
+  },
+  "Initial Access": {
+    description: "This traffic looks like an attempt to break into your systems — for example, by repeatedly guessing passwords or exploiting a web application weakness.",
+    steps: [
+      "Reset passwords for any accounts or services that were targeted (e.g. FTP, SSH, web login).",
+      "Enable or verify multi-factor authentication (MFA) on those accounts.",
+      "Block the source IP at the firewall immediately.",
+      "Review recent login logs for other suspicious attempts from the same source or time window.",
+      "Notify your security or IT team to investigate whether any attempt succeeded.",
+    ],
+  },
+  "Lateral Movement": {
+    description: "An attacker may already be inside your network and moving between systems, trying to reach more valuable data or take control of more machines.",
+    steps: [
+      "Isolate any machines that show unusual internal connection patterns.",
+      "Change credentials (passwords, service accounts) for systems involved in the suspicious traffic.",
+      "Check for new or unexpected user accounts or software installed on affected systems.",
+      "Contact your IT or security team immediately — lateral movement often means an attacker already has a foothold.",
+      "Review network-segmentation rules to limit which systems can talk to each other.",
+    ],
+  },
+  "Command & Control": {
+    description: "A machine on your network may be receiving remote instructions from an attacker — often a sign that malware (like a bot) is installed and being controlled from outside.",
+    steps: [
+      "Disconnect the suspected machine from the network to stop the communication channel.",
+      "Run a malware scan on the machine immediately.",
+      "Block the external IP addresses or domains involved at the firewall and DNS level.",
+      "Change credentials for any accounts used on that machine.",
+      "Engage your IT or security team — this usually requires a full incident-response process.",
+    ],
+  },
+  "Impact": {
+    description: "Your systems are under a disruptive attack — most likely a denial-of-service (DoS/DDoS) intended to make your services unavailable.",
+    steps: [
+      "Enable DDoS protection or rate-limiting at your firewall or hosting provider.",
+      "Contact your ISP or cloud provider to activate traffic scrubbing or upstream filtering.",
+      "Block the attacking IP ranges at the network edge if your firewall can handle the volume.",
+      "Activate any business-continuity or failover plan to maintain service for legitimate users.",
+      "Document the timeline and notify management — a service disruption may require customer or regulatory communication.",
+    ],
+  },
+  "Normal Traffic": null,   // signals "no action needed" branch
+  "Unknown Stage": null,    // signals fallback / unavailable branch
+};
+
+/*
+ * humaniseFeature — maps raw SHAP/model feature names to plain-English phrases
+ * a non-technical reader can understand. Falls back to the raw name if not found.
+ */
+function humaniseFeature(name) {
+  const map = {
+    // Connection counts / rate
+    "Flow Duration":           "how long the connection stayed open",
+    "Flow Packets/s":          "how many data packets were sent per second",
+    "Flow Bytes/s":            "how much data was transferred per second",
+    "Total Fwd Packets":       "total packets sent toward the server",
+    "Total Backward Packets":  "total reply packets from the server",
+    // Flag-based features
+    "SYN Flag Count":          "number of connection-start requests (SYN flags)",
+    "FIN Flag Count":          "number of connection-close signals",
+    "RST Flag Count":          "number of abrupt connection resets",
+    "ACK Flag Count":          "number of acknowledgement signals",
+    "PSH Flag Count":          "number of data-push signals",
+    "URG Flag Count":          "number of urgent-data signals",
+    // Packet size / IAT
+    "Fwd Packet Length Max":   "size of the largest packet sent to the server",
+    "Fwd Packet Length Min":   "size of the smallest packet sent to the server",
+    "Fwd Packet Length Mean":  "average packet size sent to the server",
+    "Bwd Packet Length Max":   "size of the largest reply packet from the server",
+    "Bwd Packet Length Mean":  "average reply packet size",
+    "Packet Length Mean":      "average packet size overall",
+    "Packet Length Std":       "how much packet sizes varied",
+    "Packet Length Variance":  "variability in packet sizes",
+    "Fwd IAT Mean":            "average gap between packets sent to the server",
+    "Fwd IAT Std":             "how much the sending gap varied",
+    "Bwd IAT Mean":            "average gap between reply packets",
+    "Flow IAT Mean":           "average gap between all packets in the flow",
+    "Flow IAT Std":            "how much the gap between packets varied",
+    "Flow IAT Max":            "the longest pause between packets in this flow",
+    // Subflow / bulk
+    "Subflow Fwd Packets":     "packets sent in sub-flows toward the server",
+    "Subflow Fwd Bytes":       "bytes sent in sub-flows toward the server",
+    "Subflow Bwd Packets":     "packets received in sub-flows from the server",
+    "Subflow Bwd Bytes":       "bytes received in sub-flows from the server",
+    // Misc
+    "Active Mean":             "average time the connection was actively transferring data",
+    "Idle Mean":               "average time the connection was idle",
+    "Init_Win_bytes_forward":  "initial window size offered by the sender",
+    "Init_Win_bytes_backward": "initial window size offered by the receiver",
+    "act_data_pkt_fwd":        "packets that actually carried data (forward)",
+    "min_seg_size_forward":    "smallest segment size sent toward the server",
+  };
+  return map[name] || name;
+}
+
+/*
+ * buildFeatureReason — turns the top 2-3 SHAP features into a plain sentence.
+ * e.g. "an unusually high SYN flag count and large variation in packet sizes"
+ */
+function buildFeatureReason(topFeatures) {
+  const top = (topFeatures || []).slice(0, 3);
+  if (!top.length) return null;
+  const phrases = top.map((f) => humaniseFeature(f.feature));
+  if (phrases.length === 1) return phrases[0];
+  if (phrases.length === 2) return `${phrases[0]} and ${phrases[1]}`;
+  return `${phrases[0]}, ${phrases[1]}, and ${phrases[2]}`;
+}
+
+function renderFindings(root) {
+  root.appendChild(el("h1", {}, "Key Findings"));
+  root.appendChild(el("p", { class: "page-lede" },
+    "A plain-language summary of the latest analysis — written for a manager or non-technical reader. For full technical detail, see the other pages."));
+
+  const a = state.analysis;
+  if (!a) { emptyState(root); return; }
+
+  // ── Data extraction (same fields used by renderDashboard / renderReport) ──
+  const prob  = a.prediction?.attack_risk_probability ?? null;
+  const stage = a.current_context?.rule_based_mitre_stage ?? "Unknown Stage";
+  const forecastPeak = (a.forecast || []).reduce(
+    (m, s) => Math.max(m, s.infiltration_prob ?? 0), prob ?? 0
+  );
+
+  // Risk label — same thresholds as riskBadge()
+  let riskLabel, riskAlertClass;
+  if (prob === null)    { riskLabel = "unknown";  riskAlertClass = "alert-info"; }
+  else if (prob >= 0.7) { riskLabel = "High";     riskAlertClass = "alert-error"; }
+  else if (prob >= 0.3) { riskLabel = "Medium";   riskAlertClass = "alert-warn"; }
+  else                  { riskLabel = "Low";       riskAlertClass = "alert-info"; }
+
+  // Plain-language stage translation
+  const stageDescriptions = {
+    "Reconnaissance":   "probing and scanning for weaknesses (what security teams call 'Reconnaissance')",
+    "Initial Access":   "attempting to break in from the outside (what security teams call 'Initial Access')",
+    "Lateral Movement": "moving between systems inside the network (what security teams call 'Lateral Movement')",
+    "Command & Control": "remotely controlling a machine on your network (what security teams call 'Command & Control')",
+    "Impact":           "trying to disrupt or disable your services (what security teams call 'Impact')",
+    "Normal Traffic":   "normal activity with no detected attack pattern",
+    "Unknown Stage":    null,
+  };
+  const stagePhrase = stageDescriptions[stage] ?? null;
+
+  // ── Plain-language summary panel ──────────────────────────────────────────
+  const featureReason = buildFeatureReason(a.top_features);
+
+  let summaryText;
+  if (stage === "Normal Traffic") {
+    summaryText = prob !== null
+      ? `The analyzed traffic looks like normal, benign activity — currently rated ${riskLabel} risk (${(prob * 100).toFixed(0)}%). No attack pattern was detected.`
+      : "The analyzed traffic looks like normal, benign activity. No attack pattern was detected.";
+  } else if (stagePhrase && prob !== null) {
+    summaryText = `This traffic shows signs of ${stagePhrase}, currently rated ${riskLabel} risk (${(prob * 100).toFixed(0)}%).`;
+  } else if (stagePhrase) {
+    summaryText = `This traffic shows signs of ${stagePhrase}.`;
+  } else {
+    summaryText = prob !== null
+      ? `The model assigned a ${riskLabel} attack-risk score (${(prob * 100).toFixed(0)}%) to this traffic, but the specific attack stage could not be determined with the available data.`
+      : "The attack stage and risk level could not be determined from the available data.";
+  }
+
+  let reasonText = null;
+  if (featureReason && stage !== "Normal Traffic") {
+    reasonText = `The model flagged this traffic mainly because of ${featureReason}.`;
+  }
+
+  const summaryChildren = [
+    el("h2", {}, "At a glance"),
+    el("p", {}, summaryText),
+  ];
+  if (reasonText) summaryChildren.push(el("p", {}, reasonText));
+
+  root.appendChild(el("div", { class: "panel" }, summaryChildren));
+
+  // Quick-stat strip (reuses existing CSS classes)
+  root.appendChild(el("div", { class: "stat-strip" }, [
+    el("div", { class: `stat-cell ${prob === null ? "" : prob >= 0.7 ? "risk-high" : prob >= 0.3 ? "risk-medium" : "risk-low"}` }, [
+      el("div", { class: "stat-label" }, "Current risk level"),
+      el("div", { class: "stat-value" }, prob !== null ? `${(prob * 100).toFixed(0)}%` : "—"),
+      el("div", { class: "stat-sub" }, [riskBadge(prob)]),
+    ]),
+    el("div", { class: "stat-cell" }, [
+      el("div", { class: "stat-label" }, "Attack stage detected"),
+      el("div", { class: "stat-value", style: "font-size:14px;" }, stage),
+    ]),
+    el("div", { class: "stat-cell" }, [
+      el("div", { class: "stat-label" }, "Peak forecast risk"),
+      el("div", { class: "stat-value" }, `${(forecastPeak * 100).toFixed(0)}%`),
+      el("div", { class: "stat-sub" }, "next 5 rollout steps"),
+    ]),
+  ]));
+
+  // ── "What this means" + defense checklist ────────────────────────────────
+  const stageInfo = Object.prototype.hasOwnProperty.call(MITRE_PLAIN, stage)
+    ? MITRE_PLAIN[stage]
+    : undefined;  // key genuinely absent → Unknown Stage fallback
+
+  if (stage === "Normal Traffic") {
+    // Reassuring note — no checklist needed
+    root.appendChild(el("div", { class: "panel" }, [
+      el("h2", {}, "What this means"),
+      el("div", { class: "alert alert-info" },
+        "No attack pattern was detected in this capture — no immediate action is needed beyond your normal monitoring practices."),
+    ]));
+  } else if (stageInfo && stageInfo.steps) {
+    // Known stage — full description + ordered checklist
+    root.appendChild(el("div", { class: "panel" }, [
+      el("h2", {}, "What this means"),
+      el("p", {}, stageInfo.description),
+      el("h2", {}, "Recommended next steps"),
+      el("ol", { class: "findings-checklist" },
+        stageInfo.steps.map((s) => el("li", {}, s))
+      ),
+    ]));
+  } else {
+    // Unknown / missing stage — same "unavailable" pattern used elsewhere
+    root.appendChild(el("div", { class: "panel" }, [
+      el("h2", {}, "What this means"),
+      el("p", { class: "metric-sub" },
+        "The attack stage could not be determined from this capture. " +
+        "No stage-specific guidance is available — if you are concerned, " +
+        "share the full report with your IT or security team."),
+    ]));
+  }
+
+  // Model limitations inherited from the analysis result
+  if (a.limitations && a.limitations.length) {
+    root.appendChild(el("div", { class: "panel" }, [
+      el("h2", {}, "Model limitations relevant to this result"),
+      el("ul", { class: "limitations-list" },
+        a.limitations.map((l) => el("li", {}, l))
+      ),
+    ]));
+  }
+
+  // ── Disclaimer ───────────────────────────────────────────────────────────
+  root.appendChild(el("p", { class: "metric-sub" },
+    "This page simplifies technical findings for a general audience. " +
+    "It is a rule-based summary of the model output, not certified security guidance — " +
+    "for a confirmed incident, follow your organization\u2019s incident response process."
+  ));
+}
+
+// ---------------------------------------------------------------------
 init();
+

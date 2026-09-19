@@ -385,6 +385,10 @@ tbody tr:hover { background: #f8f8f5; }
 .limitations-list { font-size: 13px; color: var(--ink-soft); padding-left: 18px; }
 .limitations-list li { margin-bottom: 7px; }
 
+/* Key Findings checklist — ordered list for the defense steps */
+.findings-checklist { font-size: 13.5px; padding-left: 22px; margin: 8px 0 0; }
+.findings-checklist li { margin-bottom: 10px; line-height: 1.5; }
+
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .timeline-svg-wrap { overflow-x: auto; }
 
