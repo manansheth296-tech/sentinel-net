@@ -29,7 +29,6 @@ const PAGE_TITLES = {
   shap: "SHAP Explainability",
   performance: "Model Performance",
   technical: "Technical Details",
-  report: "Report",
 };
 
 // ---------------------------------------------------------------------
@@ -107,7 +106,6 @@ function renderCurrentPage() {
     shap: renderShap,
     performance: renderPerformance,
     technical: renderTechnical,
-    report: renderReport,
   };
   (renderers[state.page] || renderDashboard)(root);
 }
@@ -699,41 +697,9 @@ function renderTechnical(root) {
 }
 
 // ---------------------------------------------------------------------
-// Report
+// Shared export helpers
 // ---------------------------------------------------------------------
-function renderReport(root) {
-  root.appendChild(el("h1", {}, "Report"));
-  const a = state.analysis;
-  if (!a) { emptyState(root); return; }
-
-  root.appendChild(el("div", { class: "panel" }, [
-    el("h2", {}, "Analysis Summary"),
-    el("table", {}, [el("tbody", {}, [
-      tr("Source file", state.sourceFileName || "—"),
-      tr("Attack risk probability", fmtPct(a.prediction?.attack_risk_probability)),
-      tr("Predicted stage (rule-based)", a.current_context?.rule_based_mitre_stage ?? "—"),
-      tr("Peak forecast risk", fmtPct(Math.max(...(a.forecast || []).map((s) => s.infiltration_prob ?? 0), a.prediction?.attack_risk_probability ?? 0))),
-      tr("Windows analyzed", a.metadata?.windows_in_session ?? "—"),
-      tr("SHAP method used", a.shap?.method ?? "—"),
-    ])]),
-  ]));
-
-  root.appendChild(el("div", { class: "panel" }, [
-    el("h2", {}, "Top SHAP Drivers"),
-    buildFeatureBars(a.top_features || []),
-  ]));
-
-  root.appendChild(el("div", { class: "panel" }, [
-    el("h2", {}, "Limitations"),
-    el("ul", { class: "limitations-list" }, (a.limitations || []).map((l) => el("li", {}, l))),
-  ]));
-
-  root.appendChild(el("div", { class: "panel report-actions" }, [
-    el("button", { class: "btn", onclick: downloadReport }, "Download Report (.json)"),
-  ]));
-}
-
-function downloadReport() {
+function downloadAnalysisJson() {
   const blob = new Blob([JSON.stringify(state.analysis, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -743,6 +709,10 @@ function downloadReport() {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+function printFindings() {
+  window.print();
 }
 
 // ---------------------------------------------------------------------
@@ -936,10 +906,15 @@ function renderFindings(root) {
   ];
   if (reasonText) summaryChildren.push(el("p", {}, reasonText));
 
-  root.appendChild(el("div", { class: "panel" }, summaryChildren));
+  // Everything inside printArea will appear in the @media print layout;
+  // the action buttons (below) are appended to root directly and are hidden when printing.
+  const printArea = el("div", { id: "findings-print-area" });
+  root.appendChild(printArea);
+
+  printArea.appendChild(el("div", { class: "panel" }, summaryChildren));
 
   // Quick-stat strip (reuses existing CSS classes)
-  root.appendChild(el("div", { class: "stat-strip" }, [
+  printArea.appendChild(el("div", { class: "stat-strip" }, [
     el("div", { class: `stat-cell ${prob === null ? "" : prob >= 0.7 ? "risk-high" : prob >= 0.3 ? "risk-medium" : "risk-low"}` }, [
       el("div", { class: "stat-label" }, "Current risk level"),
       el("div", { class: "stat-value" }, prob !== null ? `${(prob * 100).toFixed(0)}%` : "—"),
@@ -963,14 +938,14 @@ function renderFindings(root) {
 
   if (stage === "Normal Traffic") {
     // Reassuring note — no checklist needed
-    root.appendChild(el("div", { class: "panel" }, [
+    printArea.appendChild(el("div", { class: "panel" }, [
       el("h2", {}, "What this means"),
       el("div", { class: "alert alert-info" },
         "No attack pattern was detected in this capture — no immediate action is needed beyond your normal monitoring practices."),
     ]));
   } else if (stageInfo && stageInfo.steps) {
     // Known stage — full description + ordered checklist
-    root.appendChild(el("div", { class: "panel" }, [
+    printArea.appendChild(el("div", { class: "panel" }, [
       el("h2", {}, "What this means"),
       el("p", {}, stageInfo.description),
       el("h2", {}, "Recommended next steps"),
@@ -980,7 +955,7 @@ function renderFindings(root) {
     ]));
   } else {
     // Unknown / missing stage — same "unavailable" pattern used elsewhere
-    root.appendChild(el("div", { class: "panel" }, [
+    printArea.appendChild(el("div", { class: "panel" }, [
       el("h2", {}, "What this means"),
       el("p", { class: "metric-sub" },
         "The attack stage could not be determined from this capture. " +
@@ -991,7 +966,7 @@ function renderFindings(root) {
 
   // Model limitations inherited from the analysis result
   if (a.limitations && a.limitations.length) {
-    root.appendChild(el("div", { class: "panel" }, [
+    printArea.appendChild(el("div", { class: "panel" }, [
       el("h2", {}, "Model limitations relevant to this result"),
       el("ul", { class: "limitations-list" },
         a.limitations.map((l) => el("li", {}, l))
@@ -1000,12 +975,29 @@ function renderFindings(root) {
   }
 
   // ── Disclaimer ───────────────────────────────────────────────────────────
-  root.appendChild(el("p", { class: "metric-sub" },
+  printArea.appendChild(el("p", { class: "metric-sub" },
     "This page simplifies technical findings for a general audience. " +
     "It is a rule-based summary of the model output, not certified security guidance — " +
     "for a confirmed incident, follow your organization\u2019s incident response process."
   ));
+
+  // ── Action buttons (outside print area — hidden when printing) ────────────
+  const actionsRow = el("div", { class: "panel report-actions findings-actions" }, [
+    el("button", {
+      class: "btn",
+      id: "findings-btn-json",
+      onclick: downloadAnalysisJson,
+    }, "Download as JSON"),
+    el("button", {
+      class: "btn btn-secondary",
+      id: "findings-btn-pdf",
+      title: "Opens the print dialog — choose \u2018Save as PDF\u2019 as the destination",
+      onclick: printFindings,
+    }, "Download as PDF\u2026"),
+  ]);
+  root.appendChild(actionsRow);
 }
+
 
 // ---------------------------------------------------------------------
 init();
