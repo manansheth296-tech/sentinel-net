@@ -40,9 +40,14 @@ values.
   from the same uploaded session; this is a legitimate but non-default
   choice worth knowing about if these SHAP numbers are compared against a
   future retrain that does ship a background set.
-- No labeled dataset is bundled, so the logistic-regression baseline in
-  `backend/train_baseline.py` cannot be executed inside this repository as
-  shipped. The API reports the baseline as unavailable unless a real
-  benchmark JSON (produced by running that script against your own data)
-  is placed at `backend/baseline_result.json` or pointed to via
-  `SENTINELNET_BASELINE_JSON`.
+- The logistic-regression baseline in `backend/train_baseline.py` can be run
+  against the bundled sample CSVs in `data/samples/` without any additional
+  data. Run:
+  ```
+  python backend/train_baseline.py --output-json backend/baseline_result.json
+  ```
+  The script defaults to `data/samples/` and prefers files whose names start
+  with `sample_` (which contain labeled attack traffic). The result is a
+  **small-sample estimate** (3 files × 5% rows) — not a full CIC-IDS-2018
+  evaluation. The frontend clearly labels it as such. For a rigorous
+  comparison, pass the full dataset via `--data-dir` or `SENTINELNET_RAW_DATA_DIR`.

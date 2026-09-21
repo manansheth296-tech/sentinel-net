@@ -285,3 +285,13 @@ The next model iteration should use real timestamp-based windows, retrain with a
 ## License
 
 No license file is currently included in this repository. Add a license before distributing the project outside its intended team or organization.
+
+
+##steps 
+2. Start the server (from the project root, so backend is importable as a package):
+
+uvicorn backend.api:app --reload --port 8000
+
+3. Open the app — api.py mounts frontend/ as static files on the same server, so just go to:
+
+http://127.0.0.1:8000

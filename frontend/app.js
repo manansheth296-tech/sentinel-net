@@ -748,7 +748,11 @@ function renderPerformance(root) {
   root.appendChild(el("div", { class: "panel" }, [
     el("h2", {}, "Logistic Regression Baseline"),
     bench?.logistic_baseline?.available
-      ? buildBenchmarkTable(bench.logistic_baseline)
+      ? el("div", {}, [
+          buildBenchmarkTable(bench.logistic_baseline),
+          el("p", { class: "metric-sub", style: "margin-top:0.75rem;font-style:italic;color:var(--warn,#e6a817);" },
+            `⚠ ${bench.logistic_baseline.caveat || "Small-sample estimate — not the full CIC-IDS-2018 dataset."}`),
+        ])
       : el("p", { class: "metric-sub" }, bench?.logistic_baseline?.reason || "Run an analysis, or execute backend/train_baseline.py, to populate this section."),
   ]));
 }

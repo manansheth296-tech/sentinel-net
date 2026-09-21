@@ -90,20 +90,31 @@ def _load_logistic_baseline() -> Dict:
         try:
             with open(_BASELINE_PATH) as f:
                 data = json.load(f)
+            data_dir = data.get("data_dir", "unknown")
+            sample_frac = data.get("sample_frac", None)
+            frac_pct = f"{int(sample_frac * 100)}%" if sample_frac is not None else "unknown"
+            caveat = (
+                f"Computed on 3 sample CSV files from '{data_dir}' at {frac_pct} row sampling — "
+                "not the full CIC-IDS-2018 dataset. These numbers are a small-sample estimate "
+                "only; do not compare them directly to the World Model recorded benchmark above, "
+                "which was evaluated on a full held-out test set."
+            )
             return {
                 "available": True,
                 "f1": data.get("f1"), "precision": data.get("precision"),
                 "recall": data.get("recall"), "fpr": data.get("fpr"),
                 "source": f"Recorded run of backend/train_baseline.py, cached at {_BASELINE_PATH}",
+                "data_dir": data_dir,
+                "sample_frac": sample_frac,
+                "caveat": caveat,
             }
         except Exception as e:
             return {"available": False, "reason": f"Found {_BASELINE_PATH} but could not parse it: {e}"}
     return {
         "available": False,
-        "reason": "No cached baseline result is bundled with this repository, and the labeled "
-                  "training dataset needed to compute one is not included. Run "
-                  "backend/train_baseline.py --data-dir <your CIC-IDS-2018 CSVs> --output-json "
-                  f"{_BASELINE_PATH} to generate a real, comparable baseline.",
+        "reason": "No cached baseline result is bundled with this repository. Run "
+                  "backend/train_baseline.py --output-json "
+                  f"{_BASELINE_PATH} to generate a real baseline from the bundled sample CSVs.",
     }
 
 KNOWN_LIMITATIONS = [
