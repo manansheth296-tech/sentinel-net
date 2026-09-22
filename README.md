@@ -539,7 +539,9 @@ Built for **Smart India Hackathon 2026**, Problem Statement **SIH26153** (Nation
 
 ## 📄 License
 
-No license file is currently included in this repository. Add a `LICENSE` before distributing the project outside the team or organisation ➺  MIT is a common, permissive default for hackathon projects if the team wants to open it up.
+This project is licensed under the MIT License. You can find the full license text in the [LICENSE](LICENSE) file.
+
+This means you are free to use, modify, and distribute the code, provided that the copyright notice and license terms are included in copies or substantial portions of the software.
 
 ---
 
