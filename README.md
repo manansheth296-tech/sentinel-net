@@ -453,15 +453,6 @@ Reported on a **chronological, per-file split** (`backend/train_baseline.py` →
 
 ---
 
-## ⚠️ Model Limitations ➺  Honest Disclosure
-
-- The target is **generic any-attack**, not a dedicated infiltration label ➺  `infiltration_timeline` is an *attack-risk* forecast, not proof of infiltration specifically.
-- MITRE stage mapping is **partly heuristic** and can rely on file-level attack-family metadata rather than a purely traffic-derived per-flow stage.
-- The current checkpoint uses **200-row pseudo-windows**, not true time-based windows.
-- The benchmark is based on a chronological per-file split; some file test slices contain few or no attack windows, and **infiltration-specific performance is weaker than aggregate performance**.
-- The backend has a **safe fallback response** on inference exceptions ➺  a fallback-shaped response should never be read as a successful prediction; check backend logs when results look suspicious.
-- The checked-in V4 artifacts (`world_model_v4_best.pt`, `scaler_v4.pkl`, `export_bundle_v4.json`) **must remain a matched set** ➺  replacing only one can silently produce invalid predictions.
-
 Full handoff and evaluation detail: [`model/README_LSTM_WORLD_MODEL.md`](model/README_LSTM_WORLD_MODEL.md).
 
 ---
