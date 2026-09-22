@@ -35,11 +35,9 @@
 
 <br/>
 
-<img src="assets/architecture_diagram.png" width="100%" alt="SentinelNet LSTM World Model Architecture"/>
+<img src="assets/Architecture.png" width="100%" alt="SentinelNet LSTM World Model Architecture"/>
 
 <br/>
-
-> ⚠️ **Project status: internal prototype / hackathon demonstration.** The current model is trained on a generic *any-attack* target, not an infiltration-only target. See [Model Limitations](#️-model-limitations--honest-disclosure) before treating results as operational.
 
 </div>
 
@@ -154,7 +152,6 @@ The deployed **V4 bundle** uses fixed **200-row pseudo-windows** rather than tru
 7. Aggregates each window into a 156-D state and takes the **latest 20 states**
 8. Applies the **pre-trained `StandardScaler`** (`model/scaler_v4.pkl`) ➺  it is *never* fit on uploaded data
 
-> ⚠️ The training data did not contain usable destination-port values, so `unique_dst_ports` was effectively always zero during training. Real port-diversity signal should be reintroduced in a retrained checkpoint before production use.
 
 ---
 
@@ -444,7 +441,9 @@ Check the FastAPI terminal for the traceback. Common causes: missing model artif
 Reported on a **chronological, per-file split** (`backend/train_baseline.py` → `backend/baseline_result.json`) to avoid the cross-file leakage that produces artificially inflated numbers on random splits. The team additionally stress-tested the baseline with a stricter **leave-day-out** cross-validation on the real CSE-CIC-IDS2018 data:
 
 <p align="center">
-<img src="assets/leave_day_out_baseline.png" width="90%" alt="Leave-Day-Out Cross-Validation results and honest evaluation notes"/>
+<img src="assets/model-performance.png" width="90%" alt="Leave-Day-Out Cross-Validation results and honest evaluation notes"/>
+<img src="assets/risk-detection.png" width="90%" alt="Risk Detection"/>
+
 </p>
 
 **Honest findings from that stress test:**
@@ -484,13 +483,16 @@ Full handoff and evaluation detail: [`model/README_LSTM_WORLD_MODEL.md`](model/R
 **Full architecture ➺  states, dual-head LSTM, K-step rollout, MITRE mapping, SHAP:**
 
 <p align="center">
-<img src="assets/architecture_diagram.png" width="100%" alt="SentinelNet full architecture diagram"/>
+<img src="assets/sentinellnet-archi.png" width="100%" alt="SentinelNet full architecture diagram"/>
 </p>
 
 **RESULTS**
 
 <p align="center">
-<img src="assets/leave_day_out_baseline.png" width="90%" alt="Leave-day-out cross-validation and leakage findings"/>
+<img src="assets/risk-timeline.png" width="90%" alt="Risk Timeline Observed ➺ Forecast"/>
+<img src="assets/key-findings.png" width="90%" alt="Key Findings, plain language summary"/>
+
+  
 </p>
 
 ---
