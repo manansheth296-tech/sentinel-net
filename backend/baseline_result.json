@@ -1,8 +1,207 @@
 {
-  "f1": 0.0,
-  "precision": 0.0,
-  "recall": 0.0,
-  "fpr": 0.10833333333333334,
+  "split_mode": "stratified",
+  "dataset": "sample_files",
+  "f1": 0.9806451612903225,
+  "precision": 0.9620253164556962,
+  "recall": 1.0,
+  "fpr": 0.06818181818181818,
   "data_dir": "C:\\Users\\Admin\\Downloads\\sentinel-net-main (5)\\sentinel-net-main\\data\\samples",
-  "sample_frac": 0.05
+  "sample_frac": 0.05,
+  "leave_file_out": [
+    {
+      "held_out": "sample_critical_80_95.csv",
+      "train_files": [
+        "sample_high_67_79.csv",
+        "sample_moderate_30_50.csv"
+      ],
+      "f1": 0.9389121338912134,
+      "precision": 0.9997029997029997,
+      "recall": 0.8850907178543256,
+      "fpr": 0.005076142131979695,
+      "positives_in_test": 3803,
+      "test_size": 4000
+    },
+    {
+      "held_out": "sample_high_67_79.csv",
+      "train_files": [
+        "sample_critical_80_95.csv",
+        "sample_moderate_30_50.csv"
+      ],
+      "f1": 0.9996145445201079,
+      "precision": 1.0,
+      "recall": 0.9992293860775752,
+      "fpr": 0.0,
+      "positives_in_test": 3893,
+      "test_size": 4000
+    },
+    {
+      "held_out": "sample_moderate_30_50.csv",
+      "train_files": [
+        "sample_critical_80_95.csv",
+        "sample_high_67_79.csv"
+      ],
+      "f1": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "fpr": 0.40710177544386095,
+      "positives_in_test": 0,
+      "test_size": 3999
+    }
+  ],
+  "leave_day_out": {
+    "dataset": "cse-cic-ids2018-4day",
+    "real_data_dir": "data/CIC-IDS2018",
+    "sample_frac": 0.05,
+    "validation_report": {
+      "passed": true,
+      "warnings": [
+        "Friday-16-02-2018_TrafficForML_CICFlowMeter.csv: 1 stray header row(s) \u2014 dropped automatically during cache build."
+      ],
+      "hard_failures": [],
+      "files": [
+        {
+          "file": "Friday-02-03-2018_TrafficForML_CICFlowMeter.csv",
+          "total_rows": 1048575,
+          "stray_header_rows": 0,
+          "label_counts": {
+            "Bot": 286191,
+            "Benign": 762384
+          },
+          "column_mismatches": {},
+          "rows_with_bad_string_values": 4050,
+          "inf_numeric_cells": 5542,
+          "nan_numeric_cells_after_coerce": 2558,
+          "nan_pct": 0.3862
+        },
+        {
+          "file": "Friday-16-02-2018_TrafficForML_CICFlowMeter.csv",
+          "total_rows": 1048574,
+          "stray_header_rows": 1,
+          "label_counts": {
+            "DoS attacks-SlowHTTPTest": 139890,
+            "DoS attacks-Hulk": 461912,
+            "Benign": 446772
+          },
+          "column_mismatches": {},
+          "rows_with_bad_string_values": 0,
+          "inf_numeric_cells": 0,
+          "nan_numeric_cells_after_coerce": 0,
+          "nan_pct": 0.0
+        },
+        {
+          "file": "Thursday-22-02-2018_TrafficForML_CICFlowMeter.csv",
+          "total_rows": 1048575,
+          "stray_header_rows": 0,
+          "label_counts": {
+            "Benign": 1048213,
+            "Brute Force -Web": 249,
+            "Brute Force -XSS": 79,
+            "SQL Injection": 34
+          },
+          "column_mismatches": {},
+          "rows_with_bad_string_values": 5610,
+          "inf_numeric_cells": 7651,
+          "nan_numeric_cells_after_coerce": 3569,
+          "nan_pct": 0.535
+        },
+        {
+          "file": "Wednesday-14-02-2018_TrafficForML_CICFlowMeter.csv",
+          "total_rows": 1048575,
+          "stray_header_rows": 0,
+          "label_counts": {
+            "FTP-BruteForce": 193360,
+            "Benign": 667626,
+            "SSH-Bruteforce": 187589
+          },
+          "column_mismatches": {},
+          "rows_with_bad_string_values": 3824,
+          "inf_numeric_cells": 5371,
+          "nan_numeric_cells_after_coerce": 2277,
+          "nan_pct": 0.3647
+        }
+      ]
+    },
+    "folds": [
+      {
+        "held_out": "Friday-02-03-2018_TrafficForML_CICFlowMeter.csv",
+        "train_files": [
+          "Friday-16-02-2018_TrafficForML_CICFlowMeter.csv",
+          "Thursday-22-02-2018_TrafficForML_CICFlowMeter.csv",
+          "Wednesday-14-02-2018_TrafficForML_CICFlowMeter.csv"
+        ],
+        "f1": 2.08474487934539e-05,
+        "precision": 0.0018587360594795538,
+        "recall": 1.048250993217816e-05,
+        "fpr": 0.0021131083548448027,
+        "tp": 3,
+        "fp": 1611,
+        "fn": 286188,
+        "tn": 760773,
+        "average_precision": 0.544586454036689,
+        "positives_in_test": 286191,
+        "positives_in_test_pct": 27.2933,
+        "test_size": 1048575
+      },
+      {
+        "held_out": "Friday-16-02-2018_TrafficForML_CICFlowMeter.csv",
+        "train_files": [
+          "Friday-02-03-2018_TrafficForML_CICFlowMeter.csv",
+          "Thursday-22-02-2018_TrafficForML_CICFlowMeter.csv",
+          "Wednesday-14-02-2018_TrafficForML_CICFlowMeter.csv"
+        ],
+        "f1": 0.9748405808869615,
+        "precision": 0.9927626240613032,
+        "recall": 0.9575541457157005,
+        "fpr": 0.009403006455194148,
+        "tp": 576258,
+        "fp": 4201,
+        "fn": 25544,
+        "tn": 442571,
+        "average_precision": 0.9940838167772935,
+        "positives_in_test": 601802,
+        "positives_in_test_pct": 57.3924,
+        "test_size": 1048574
+      },
+      {
+        "held_out": "Thursday-22-02-2018_TrafficForML_CICFlowMeter.csv",
+        "train_files": [
+          "Friday-02-03-2018_TrafficForML_CICFlowMeter.csv",
+          "Friday-16-02-2018_TrafficForML_CICFlowMeter.csv",
+          "Wednesday-14-02-2018_TrafficForML_CICFlowMeter.csv"
+        ],
+        "f1": 0.011217391304347827,
+        "precision": 0.005698383249403658,
+        "recall": 0.356353591160221,
+        "fpr": 0.021473689030759968,
+        "tp": 129,
+        "fp": 22509,
+        "fn": 233,
+        "tn": 1025704,
+        "average_precision": 0.004784055339135107,
+        "positives_in_test": 362,
+        "positives_in_test_pct": 0.0345,
+        "test_size": 1048575
+      },
+      {
+        "held_out": "Wednesday-14-02-2018_TrafficForML_CICFlowMeter.csv",
+        "train_files": [
+          "Friday-02-03-2018_TrafficForML_CICFlowMeter.csv",
+          "Friday-16-02-2018_TrafficForML_CICFlowMeter.csv",
+          "Thursday-22-02-2018_TrafficForML_CICFlowMeter.csv"
+        ],
+        "f1": 0.7668897827336119,
+        "precision": 0.938937713197014,
+        "recall": 0.6481287521426753,
+        "fpr": 0.024050890768184584,
+        "tp": 246904,
+        "fp": 16057,
+        "fn": 134045,
+        "tn": 651569,
+        "average_precision": 0.8792736313576405,
+        "positives_in_test": 380949,
+        "positives_in_test_pct": 36.3302,
+        "test_size": 1048575
+      }
+    ]
+  }
 }

@@ -26,4 +26,8 @@ dist-ssr/
 # Archives
 *.zip
 
+# Datasets and cache
+data/CIC-IDS2018/
+.cache/
+
 

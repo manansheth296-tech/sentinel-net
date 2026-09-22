@@ -559,6 +559,7 @@ async function refreshHealth() {
 async function loadStaticInfo() {
   try { state.modelInfo = await apiGet("/api/model"); } catch (e) { /* shown as unavailable in Technical page */ }
   try { state.mitreInfo = await apiGet("/api/mitre"); } catch (e) { /* shown as unavailable in MITRE page */ }
+  try { state.benchmark = await apiGet("/api/benchmark"); } catch (e) { /* fallback */ }
 }
 
 function init() {
@@ -1096,7 +1097,7 @@ function buildFeatureBars(rows) {
 function renderPerformance(root) {
   root.appendChild(el("h1", {}, "Model Performance"));
 
-  const bench = state.analysis?.benchmark || null;
+  const bench = state.analysis?.benchmark || state.benchmark || null;
   const info = state.modelInfo;
 
   root.appendChild(el("div", { class: "panel" }, [
@@ -1107,14 +1108,135 @@ function renderPerformance(root) {
 
   root.appendChild(el("div", { class: "panel" }, [
     el("h2", {}, "Logistic Regression Baseline"),
-    bench?.logistic_baseline?.available
-      ? el("div", {}, [
-          buildBenchmarkTable(bench.logistic_baseline),
-          el("p", { class: "metric-sub", style: "margin-top:0.75rem;font-style:italic;color:var(--warn,#e6a817);" },
-            `⚠ ${bench.logistic_baseline.caveat || "Small-sample estimate — not the full CIC-IDS-2018 dataset."}`),
-        ])
-      : el("p", { class: "metric-sub" }, bench?.logistic_baseline?.reason || "Run an analysis, or execute backend/train_baseline.py, to populate this section."),
+    buildLogisticBaselineSection(bench?.logistic_baseline),
   ]));
+}
+
+function buildLogisticBaselineSection(bl) {
+  if (!bl || !bl.available) {
+    return el("p", { class: "metric-sub" }, bl?.reason || "Run an analysis, or execute backend/train_baseline.py, to populate this section.");
+  }
+
+  const container = el("div", {});
+
+  // If leave-day-out results are available, make them the primary, bold main table
+  if (bl.leave_day_out && Array.isArray(bl.leave_day_out.folds) && bl.leave_day_out.folds.length > 0) {
+    const lodo = bl.leave_day_out;
+    const folds = lodo.folds;
+
+    container.appendChild(el("div", { style: "margin-bottom: 0.85rem;" }, [
+      el("h3", { style: "margin: 0 0 4px 0; font-size: 15px; font-weight: 700; color: var(--ink-950);" },
+        "Leave-Day-Out Cross-Validation (Real CSE-CIC-IDS2018 Data)"
+      ),
+      el("p", { class: "metric-sub", style: "margin: 0 0 0.5rem 0;" },
+        `Evaluated across 4 full days (~1.05M flows per test fold; trained on the remaining 3 days at ${lodo.sample_frac ? (lodo.sample_frac * 100).toFixed(0) : "5"}% subsample). ` +
+        `This tests genuine cross-day generalization across different attack types and base rates.`
+      ),
+    ]));
+
+    function getFoldMeta(fn) {
+      if (fn.includes("Friday-02-03")) return { name: "Friday-02-03", attack: "Botnet", lowBase: false };
+      if (fn.includes("Friday-16-02")) return { name: "Friday-16-02", attack: "DoS (Hulk / SlowHTTPTest)", lowBase: false };
+      if (fn.includes("Thursday-22-02")) return { name: "Thursday-22-02", attack: "Web / Infiltration", lowBase: true };
+      if (fn.includes("Wednesday-14-02")) return { name: "Wednesday-14-02", attack: "BruteForce (FTP / SSH)", lowBase: false };
+      return { name: fn.split("_")[0] || fn, attack: "Unknown", lowBase: false };
+    }
+
+    const table = el("table", {}, [
+      el("thead", {}, el("tr", {}, [
+        "Held-Out Day",
+        "Attack Type",
+        "F1 Score",
+        "Average Precision",
+        "Recall",
+        "FPR",
+        "TP / FN",
+        "Test Positives"
+      ].map((h) => el("th", {}, h)))),
+      el("tbody", {}, folds.map((f) => {
+        const meta = getFoldMeta(f.held_out || "");
+        const isLowBase = meta.lowBase || (f.positives_in_test_pct < 1.0);
+        const dayCell = el("td", { style: "font-weight: 700;" }, meta.name);
+        const attackCell = el("td", {}, [
+          meta.attack,
+          isLowBase ? el("span", { style: "margin-left: 6px; font-size: 11px; padding: 1px 5px; background: rgba(230,168,23,0.18); color: #975a00; border-radius: 2px; font-weight: 600;" }, "<1% attack") : null
+        ]);
+        const f1Cell = el("td", { style: (isLowBase || f.f1 < 0.05) ? "font-weight: 700; color: var(--signal-amber, #c27b00);" : "font-weight: 700;" }, fmtNum(f.f1));
+        const apCell = el("td", { style: "font-weight: 700;" }, fmtNum(f.average_precision));
+        const recCell = el("td", {}, fmtNum(f.recall));
+        const fprCell = el("td", {}, fmtNum(f.fpr));
+        const tpFnCell = el("td", {}, `${(f.tp ?? 0).toLocaleString()} / ${(f.fn ?? 0).toLocaleString()}`);
+        const testPosCell = el("td", {}, `${(f.positives_in_test ?? 0).toLocaleString()} (${(f.positives_in_test_pct ?? 0).toFixed(2)}%)`);
+
+        return el("tr", {}, [dayCell, attackCell, f1Cell, apCell, recCell, fprCell, tpFnCell, testPosCell]);
+      }))
+    ]);
+
+    container.appendChild(el("div", { class: "table-scroll" }, [table]));
+
+    // Explanations callout box
+    container.appendChild(el("div", {
+      style: "margin-top: 1rem; padding: 0.85rem 1.1rem; border-left: 3px solid var(--accent, #336699); background: #f9f9fb; font-size: 13px; line-height: 1.5;"
+    }, [
+      el("div", { style: "font-weight: 700; margin-bottom: 0.35rem; color: var(--ink-950);" }, "Evaluation Findings & Behavioral Explanations:"),
+      el("ul", { style: "margin: 0; padding-left: 1.25rem;" }, [
+        el("li", { style: "margin-bottom: 0.4rem;" }, [
+          el("strong", {}, "Botnet Zero-Shot Generalization Collapse: "),
+          "The Friday-02-03 (Botnet) fold scores F1 0.0000 because none of the other 3 training days contain any Botnet examples — the model has never seen that attack type when this day is held out. This is an expected limitation of a small, few-day baseline, not a bug. Despite threshold collapse, Average Precision (0.5446) confirms significant underlying ranking signal."
+        ]),
+        el("li", { style: "margin-bottom: 0.4rem;" }, [
+          el("strong", {}, "Severe Base-Rate Imbalance on Thursday: "),
+          "The Thursday-22-02 fold has <1% (0.035%) attack rows in its test set (362 positives out of 1,048,575 flows). Standard F1 (0.0112) is artificially depressed by the extreme class imbalance. The model successfully detected 129 out of 362 intrusions (Recall 0.3564); Average Precision (0.0048) and raw TP count provide the accurate evaluation."
+        ]),
+        el("li", {}, [
+          el("strong", {}, "High Cross-Day Variance: "),
+          "F1 ranges from 0.0000 to 0.9748 across folds (range 0.9748). Unlike random splits that leak signatures across folds, leave-day-out exposes how performance fluctuates with unseen attack categories."
+        ])
+      ])
+    ]));
+
+    // Subordinate section: Stratified sample number & LOFO proof
+    const subSection = el("div", {
+      style: "margin-top: 1.5rem; padding: 0.85rem 1.1rem; border: 1px dashed #d0d5dd; border-radius: 4px; background: #fafafa; font-size: 12.5px;"
+    }, [
+      el("div", { style: "display: flex; align-items: center; gap: 8px; margin-bottom: 0.5rem;" }, [
+        el("span", { style: "font-weight: 700; color: #b42318; font-size: 13px;" },
+          "⚠️ Stratified Sample Split: Known to be inflated by file-identity leakage — do not use this number"
+        ),
+      ]),
+      el("p", { style: "margin: 0 0 0.5rem 0; color: var(--ink-soft); line-height: 1.45;" },
+        "When trained and tested on a stratified 80/20 random split across the 3 bundled sample CSV files, " +
+        `the model reports deceptively near-perfect metrics: F1 ${fmtNum(bl.f1)}, Precision ${fmtNum(bl.precision)}, Recall ${fmtNum(bl.recall)}, FPR ${fmtNum(bl.fpr)}. ` +
+        "However, this split leaks source-file identities because each sample file is dominated by a specific class."
+      ),
+      el("p", { style: "margin: 0; color: var(--ink-soft); line-height: 1.45;" }, [
+        el("strong", {}, "Leakage Proof (Sample-file Leave-File-Out): "),
+        bl.leave_file_out && bl.leave_file_out.length > 0
+          ? `Holding out each sample file one by one causes F1 to swing between ${Math.min(...bl.leave_file_out.map(r => r.f1 || 0)).toFixed(4)} and ${Math.max(...bl.leave_file_out.map(r => r.f1 || 0)).toFixed(4)} (range ${(Math.max(...bl.leave_file_out.map(r => r.f1 || 0)) - Math.min(...bl.leave_file_out.map(r => r.f1 || 0))).toFixed(4)}). When the benign-dominated file is held out, F1 collapses to 0.0000 and FPR jumps to 0.4071, proving the linear model was learning 'which file did this row come from' rather than attack patterns.`
+          : "Leave-file-out cross-validation collapses F1 when benign-only files are held out, proving file-identity shortcutting."
+      ])
+    ]);
+
+    container.appendChild(subSection);
+
+    // Caveat note
+    if (bl.caveat) {
+      container.appendChild(el("p", {
+        class: "metric-sub",
+        style: "margin-top: 0.75rem; font-style: italic; color: var(--ink-soft); font-size: 11.5px;"
+      }, `ℹ ${bl.caveat}`));
+    }
+
+  } else {
+    // Fallback if leave_day_out is not in the data
+    container.appendChild(buildBenchmarkTable(bl));
+    container.appendChild(el("p", {
+      class: "metric-sub",
+      style: "margin-top:0.75rem;font-style:italic;color:var(--warn,#e6a817);"
+    }, `⚠ ${bl.caveat || "Small-sample estimate — not the full CIC-IDS-2018 dataset."}`));
+  }
+
+  return container;
 }
 
 function buildBenchmarkTable(m) {

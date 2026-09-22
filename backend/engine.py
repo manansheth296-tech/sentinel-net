@@ -90,31 +90,118 @@ def _load_logistic_baseline() -> Dict:
         try:
             with open(_BASELINE_PATH) as f:
                 data = json.load(f)
-            data_dir = data.get("data_dir", "unknown")
+            data_dir    = data.get("data_dir", "unknown")
             sample_frac = data.get("sample_frac", None)
-            frac_pct = f"{int(sample_frac * 100)}%" if sample_frac is not None else "unknown"
+            split_mode  = data.get("split_mode", "stratified")
+            dataset     = data.get("dataset", "sample_files")
+            frac_pct    = f"{int(sample_frac * 100)}%" if sample_frac is not None else "unknown"
+
+            # Build LOFO summary line if leave-file-out data is present.
+            lofo = data.get("leave_file_out", [])
+            if lofo:
+                f1_vals  = [r.get("f1", 0.0) for r in lofo]
+                lofo_txt = (
+                    f" Sample-file LOFO F1 range: "
+                    f"{min(f1_vals):.4f} to {max(f1_vals):.4f} "
+                    f"(range {max(f1_vals)-min(f1_vals):.4f}"
+                    + ("; HIGH VARIANCE - file-identity shortcut confirmed"
+                       if max(f1_vals) - min(f1_vals) > 0.25 else "")
+                    + ")."
+                )
+            else:
+                lofo_txt = ""
+
+            # Build LODO summary line if leave-day-out data is present.
+            lodo_block = data.get("leave_day_out", None)
+            if lodo_block:
+                lodo_folds   = lodo_block.get("folds", [])
+                lodo_dataset = lodo_block.get("dataset", "cse-cic-ids2018-4day")
+                lodo_frac    = lodo_block.get("sample_frac", None)
+                lodo_frac_pct = (f"{int(lodo_frac * 100)}%"
+                                  if lodo_frac is not None else "unknown")
+                if lodo_folds:
+                    f1_lodo  = [r.get("f1", 0.0) for r in lodo_folds]
+                    lodo_txt = (
+                        f" Real-data ({lodo_dataset}, train sample={lodo_frac_pct}) "
+                        f"leave-day-out F1 range: "
+                        f"{min(f1_lodo):.4f} to {max(f1_lodo):.4f} "
+                        f"(range {max(f1_lodo)-min(f1_lodo):.4f}"
+                        + ("; HIGH VARIANCE - check for data-quality issues"
+                           if max(f1_lodo) - min(f1_lodo) > 0.25 else
+                           "; stable across days")
+                        + ")."
+                    )
+                    val_passed = lodo_block.get(
+                        "validation_report", {}
+                    ).get("passed", None)
+                    if val_passed is False:
+                        lodo_txt += (
+                            " WARNING: real-data validation did not fully pass "
+                            "- interpret LODO numbers with caution."
+                        )
+                    # Botnet zero-shot explanation
+                    has_botnet = any("Friday-02-03" in r.get("held_out", "") for r in lodo_folds)
+                    if has_botnet:
+                        lodo_txt += (
+                            " The Friday-02-03 (Botnet) fold scores F1 0.0000 because "
+                            "none of the other 3 training days contain any Botnet examples "
+                            "- the model has never seen that attack type when this day is "
+                            "held out. This is an expected limitation of a small, few-day baseline, not a bug."
+                        )
+                    # Note folds with <1% positive rate - F1 is misleading there
+                    low_imb = [
+                        r.get("held_out", "?").split("_")[0]
+                        for r in lodo_folds
+                        if r.get("positives_in_test_pct", 100) < 1.0
+                    ]
+                    if low_imb:
+                        lodo_txt += (
+                            f" The {', '.join(low_imb)} fold has <1% (0.035%) "
+                            "attack rows in its test set; F1 is artificially depressed by "
+                            "extreme class imbalance - use Average Precision and TP count instead."
+                        )
+                else:
+                    lodo_txt = ""
+            else:
+                lodo_block = None
+                lodo_txt   = ""
+
             caveat = (
-                f"Computed on 3 sample CSV files from '{data_dir}' at {frac_pct} row sampling — "
-                "not the full CIC-IDS-2018 dataset. These numbers are a small-sample estimate "
-                "only; do not compare them directly to the World Model recorded benchmark above, "
-                "which was evaluated on a full held-out test set."
+                f"Split mode: {split_mode} | Dataset: {dataset} | "
+                f"Sample fraction: {frac_pct} | Source dir: '{data_dir}'."
+                f"{lofo_txt}{lodo_txt} "
+                "These numbers are estimates only; do not compare them directly to "
+                "the World Model recorded benchmark above, which was evaluated on a "
+                "full held-out test set."
             )
             return {
-                "available": True,
-                "f1": data.get("f1"), "precision": data.get("precision"),
-                "recall": data.get("recall"), "fpr": data.get("fpr"),
-                "source": f"Recorded run of backend/train_baseline.py, cached at {_BASELINE_PATH}",
-                "data_dir": data_dir,
-                "sample_frac": sample_frac,
-                "caveat": caveat,
+                "available":      True,
+                "f1":             data.get("f1"),
+                "precision":      data.get("precision"),
+                "recall":         data.get("recall"),
+                "fpr":            data.get("fpr"),
+                "split_mode":     split_mode,
+                "dataset":        dataset,
+                "source":         (f"Recorded run of backend/train_baseline.py, "
+                                   f"cached at {_BASELINE_PATH}"),
+                "data_dir":       data_dir,
+                "sample_frac":    sample_frac,
+                "leave_file_out": lofo,
+                "leave_day_out":  lodo_block,
+                "caveat":         caveat,
             }
         except Exception as e:
-            return {"available": False, "reason": f"Found {_BASELINE_PATH} but could not parse it: {e}"}
+            return {
+                "available": False,
+                "reason": f"Found {_BASELINE_PATH} but could not parse it: {e}",
+            }
     return {
         "available": False,
-        "reason": "No cached baseline result is bundled with this repository. Run "
-                  "backend/train_baseline.py --output-json "
-                  f"{_BASELINE_PATH} to generate a real baseline from the bundled sample CSVs.",
+        "reason": (
+            "No cached baseline result is bundled with this repository. Run "
+            "backend/train_baseline.py --output-json "
+            f"{_BASELINE_PATH} to generate a real baseline from the bundled sample CSVs."
+        ),
     }
 
 KNOWN_LIMITATIONS = [

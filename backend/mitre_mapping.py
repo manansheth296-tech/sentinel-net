@@ -6,6 +6,7 @@
 MITRE_STAGE_MAP = {
     # Benign / Baseline
     "benign": "Normal Traffic",
+    "Benign": "Normal Traffic",
     "normal traffic": "Normal Traffic",
 
     # Reconnaissance (Scanning for vulnerabilities)
